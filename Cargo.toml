@@ -3,9 +3,6 @@ name = "wgpu_raymarching"
 authors = ["wesfly <https://github.com/wesfly>"]
 edition = "2024"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 cfg-if = "1"
 winit = { version = "0.29", features = ["rwh_05"] }
