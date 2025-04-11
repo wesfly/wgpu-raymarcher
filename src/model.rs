@@ -6,16 +6,16 @@ pub struct Vertex {
 
 pub const VERTICES: &[Vertex] = &[
     Vertex {
-        position: [-1.0, 1.0],
+        position: [-2.0, 2.0],
     },
     Vertex {
-        position: [-1.0, -1.0],
+        position: [-2.0, -2.0],
     },
     Vertex {
-        position: [1.0, -1.0],
+        position: [2.0, -2.0],
     },
     Vertex {
-        position: [1.0, 1.0],
+        position: [2.0, 2.0],
     },
 ];
 
