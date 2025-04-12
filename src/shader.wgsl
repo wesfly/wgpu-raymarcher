@@ -47,8 +47,8 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
     ));
 }
 
-fn sphere_sdf(p: vec3<f32>) -> f32 {
-    return length(p) - 1.0;
+fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
+    return length(p) - radius;
 }
 
 // fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
@@ -62,10 +62,11 @@ fn sphere_sdf(p: vec3<f32>) -> f32 {
 
 // Combined distance field
 fn scene_sdf(p: vec3<f32>) -> f32 {
-    let sphere = sphere_sdf(p - vec3<f32>(0.5, 0.5, 2.0));
+    let sphere = sphere_sdf(p - vec3<f32>(0.5, 0.5, 2.0), 1.0);
+    let sphere2 = sphere_sdf(p - vec3<f32>(2.0, 0.3, 2.0), 0.5);
     // let box = box_sdf(p - vec3<f32>(-2.0, 0.0, 0.0), vec3<f32>(1.0));
-    // return min(sphere, box);
-    return sphere;
+    return min(sphere, sphere2);
+    // return sphere;
 }
 
 @fragment
@@ -79,35 +80,35 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Raymarching parameters
     const MAX_STEPS: u32 = 64;
-    const MIN_DIST: f32 = 0.01;
-    const MAX_DIST: f32 = 100.0;
+    const MIN_DISTANCE: f32 = 0.01;
+    const MAX_DISTANCE: f32 = 100.0;
+    const GLOBAL_ILLUMINATION: f32 = 0.05;
 
     // March the ray
     var depth: f32 = 0.0;   // init depth at zero
-    var hit_pos: vec3<f32>;
+    var hit_position: vec3<f32>;
     var colour: vec4<f32>;
 
     for (var i: u32 = 0; i < MAX_STEPS; i++) {
-        hit_pos = ray_origin + ray_direction * depth;
-        let distance = scene_sdf(hit_pos);
+        hit_position = ray_origin + ray_direction * depth;
+        let distance = scene_sdf(hit_position);
 
-        if (distance < MIN_DIST) {
+        if (distance < MIN_DISTANCE) {
             // Calculate normal for shading
-            let normal = get_normal(hit_pos);
-            let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
-            let diffuse = max(0.0, dot(normal, light_dir)) * 0.8 + 0.2;
+            let normal = get_normal(hit_position);
+            let light_dir = normalize(vec3<f32>(2.5, 1.0, 1.0));
+            let diffuse = max(0.0, dot(normal, light_dir)) * 0.8 + GLOBAL_ILLUMINATION;
 
             colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
             break;
         }
 
         depth += distance;
-        if (depth >= MAX_DIST) {
+        if (depth >= MAX_DISTANCE) {
             colour = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Background colour
             break;
         }
     }
 
-    // return vec4<f32>(uv.xy / window_size, 0.0, 1.0);
     return colour;
 }
