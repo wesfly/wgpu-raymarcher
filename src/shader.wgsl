@@ -3,7 +3,7 @@ struct VertexOutput {
 };
 
 struct WindowDimensions{
-    uv: vec2<f32>
+    size: vec2<f32>
 }
 
 var<push_constant> window_dimensions: WindowDimensions;
@@ -71,7 +71,7 @@ fn scene_sdf(p: vec3<f32>) -> f32 {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Convert normalized screen coordinates to ray direction
-    let uv = (window_dimensions.uv.xy / in.clip_position.w) * 2.0 - 1.0;
+    let uv = (in.clip_position.xy / in.clip_position.w) * 2.0 - 1.0;
     let ray_origin = vec3<f32>(0.0, 0.0, 0.0);
     let ray_direction = normalize(vec3<f32>(uv.x, uv.y, 1.0));
 
@@ -106,6 +106,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    return vec4<f32>(uv.xy / 1000.0, 0.0, 1.0);
+    return vec4<f32>(uv.xy / (window_dimensions.size.xy * 2), 0.0, 1.0);
     // return colour;
 }
