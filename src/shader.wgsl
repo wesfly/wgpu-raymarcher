@@ -62,7 +62,7 @@ fn sphere_sdf(p: vec3<f32>) -> f32 {
 
 // Combined distance field
 fn scene_sdf(p: vec3<f32>) -> f32 {
-    let sphere = sphere_sdf(p - vec3<f32>(2.0, 0.0, 0.0));
+    let sphere = sphere_sdf(p - vec3<f32>(0.5, 0.5, 2.0));
     // let box = box_sdf(p - vec3<f32>(-2.0, 0.0, 0.0), vec3<f32>(1.0));
     // return min(sphere, box);
     return sphere;
@@ -70,8 +70,10 @@ fn scene_sdf(p: vec3<f32>) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let window_size = window_dimensions.size.xy * 2;
+
     // Convert normalized screen coordinates to ray direction
-    let uv = (in.clip_position.xy / in.clip_position.w) * 2.0 - 1.0;
+    let uv = ((in.clip_position.xy / in.clip_position.w) * 2.0 - 1.0) / window_size;
     let ray_origin = vec3<f32>(0.0, 0.0, 0.0);
     let ray_direction = normalize(vec3<f32>(uv.x, uv.y, 1.0));
 
@@ -106,6 +108,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    return vec4<f32>(uv.xy / (window_dimensions.size.xy * 2), 0.0, 1.0);
-    // return colour;
+    // return vec4<f32>(uv.xy / window_size, 0.0, 1.0);
+    return colour;
 }
