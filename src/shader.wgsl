@@ -2,6 +2,12 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
 };
 
+struct WindowDimensions{
+    uv: vec2<f32>
+}
+
+var<push_constant> window_dimensions: WindowDimensions;
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) in_vertex_index: u32,
@@ -15,7 +21,6 @@ fn vs_main(
         vec2<f32>(1.0, 1.0),    // BL vertex 3
     );
 
-    // Create two triangles using indices
     let indices = array<u32, 6>(
         0, 1, 2,
         0, 2, 3
@@ -57,17 +62,16 @@ fn sphere_sdf(p: vec3<f32>) -> f32 {
 
 // Combined distance field
 fn scene_sdf(p: vec3<f32>) -> f32 {
-    let sphere = sphere_sdf(p - vec3<f32>(2.0, 2.0, 0.0));
+    let sphere = sphere_sdf(p - vec3<f32>(2.0, 0.0, 0.0));
     // let box = box_sdf(p - vec3<f32>(-2.0, 0.0, 0.0), vec3<f32>(1.0));
     // return min(sphere, box);
     return sphere;
 }
 
-// Fragment shader with raymarching
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Convert normalized screen coordinates to ray direction
-    let uv = (in.clip_position.xy / in.clip_position.w) * 2.0 - 1.0;
+    let uv = (window_dimensions.uv.xy / in.clip_position.w) * 2.0 - 1.0;
     let ray_origin = vec3<f32>(0.0, 0.0, 0.0);
     let ray_direction = normalize(vec3<f32>(uv.x, uv.y, 1.0));
 
@@ -83,27 +87,25 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     for (var i: u32 = 0; i < MAX_STEPS; i++) {
         hit_pos = ray_origin + ray_direction * depth;
-        let dist = scene_sdf(hit_pos);
+        let distance = scene_sdf(hit_pos);
 
-        if (dist < MIN_DIST) {
+        if (distance < MIN_DIST) {
             // Calculate normal for shading
+            let normal = get_normal(hit_pos);
+            let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
+            let diffuse = max(0.0, dot(normal, light_dir)) * 0.8 + 0.2;
 
-            // let normal = get_normal(hit_pos);
-            // let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
-            // let diffuse = max(0.0, dot(normal, light_dir)) * 0.8 + 0.2;
-            //
-            var measured_dist = dist * 5; // make result lighter sorry for variable name
-
-            colour = vec4<f32>(measured_dist, measured_dist, measured_dist, 1.0);
+            colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
             break;
         }
 
-        depth += dist;
+        depth += distance;
         if (depth >= MAX_DIST) {
             colour = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Background colour
             break;
         }
     }
 
-    return colour;
+    return vec4<f32>(uv.xy / 1000.0, 0.0, 1.0);
+    // return colour;
 }

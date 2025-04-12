@@ -52,13 +52,16 @@ impl<'a> State<'a> {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::PUSH_CONSTANTS,
                     // WebGL doesn't support all of wgpu's features, so if
                     // we're building for the web we'll have to disable some.
                     required_limits: if cfg!(target_arch = "wasm32") {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
-                        wgpu::Limits::default()
+                        wgpu::Limits {
+                            max_push_constant_size: 256, // bytes
+                            ..Default::default()
+                        }
                     },
                     memory_hints: Default::default(),
                 },
@@ -95,7 +98,10 @@ impl<'a> State<'a> {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[],
-                push_constant_ranges: &[],
+                push_constant_ranges: &[wgpu::PushConstantRange {
+                    stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    range: 0..std::mem::size_of::<[f32; 2]>() as u32,
+                }],
             });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -202,8 +208,12 @@ impl<'a> State<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
-
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_push_constants(
+                wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                0,
+                bytemuck::cast_slice(&[self.config.height as f32, self.config.height as f32]),
+            );
             render_pass.draw(0..6, 0..1);
         }
 
