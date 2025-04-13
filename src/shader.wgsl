@@ -86,7 +86,7 @@ fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32,
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-// Calculate aspect ratio
+    // Calculate aspect ratio
     let aspect_ratio = window_dimensions.size.x / window_dimensions.size.y;
 
     // Adjust UV coordinates for aspect ratio
