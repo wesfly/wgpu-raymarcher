@@ -41,15 +41,17 @@ fn vs_main(
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
     const EPSILON: f32 = 0.001;
     return normalize(vec3<f32>(
-        scene_sdf(p + vec3<f32>(EPSILON, 0.0, 0.0)) - scene_sdf(p - vec3<f32>(EPSILON, 0.0, 0.0)),
-        scene_sdf(p + vec3<f32>(0.0, EPSILON, 0.0)) - scene_sdf(p - vec3<f32>(0.0, EPSILON, 0.0)),
-        scene_sdf(p + vec3<f32>(0.0, 0.0, EPSILON)) - scene_sdf(p - vec3<f32>(0.0, 0.0, EPSILON))
+        scene_sdf(vec3<f32>(p.x + EPSILON, p.y, p.z)) - scene_sdf(vec3<f32>(p.x - EPSILON, p.y, p.z)),
+        scene_sdf(vec3<f32>(p.x, p.y + EPSILON, p.z)) - scene_sdf(vec3<f32>(p.x, p.y - EPSILON, p.z)),
+        scene_sdf(vec3<f32>(p.x, p.y, p.z + EPSILON)) - scene_sdf(vec3<f32>(p.x, p.y, p.z - EPSILON)),
     ));
 }
 
 fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
     return length(p) - radius;
 }
+
+
 
 // fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
 //     let q = abs(p) - b;
@@ -62,11 +64,24 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
 
 // Combined distance field
 fn scene_sdf(p: vec3<f32>) -> f32 {
-    let sphere = sphere_sdf(p - vec3<f32>(0.5, 0.5, 2.0), 1.0);
-    let sphere2 = sphere_sdf(p - vec3<f32>(2.0, 0.3, 2.0), 0.5);
+    let sphere = sphere_sdf(p - vec3<f32>(0.6, 0.8, 2.0), 0.2);
+    let sphere2 = sphere_sdf(p - vec3<f32>(1.0, 0.3, 2.0), 0.5);
     // let box = box_sdf(p - vec3<f32>(-2.0, 0.0, 0.0), vec3<f32>(1.0));
     return min(sphere, sphere2);
     // return sphere;
+}
+
+fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32, light_size: f32) -> f32 {
+    var res: f32 = 1.0;
+    var t: f32 = mint;
+    for (var i: u32 = 0; i < 256 && t < maxt; i++) {
+        let h = scene_sdf(ray_origin + ray_direction * t);
+        res = min(res, h/(light_size * t));
+        t+= clamp(h, 0.005, 0.5);
+        if(res < - 1.0 || t>maxt){break;}
+    }
+    res = max(res, -1.0);
+    return 0.25*(1.0+res) * (1.0 + res) * (2.0 - res);
 }
 
 @fragment
@@ -80,9 +95,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Raymarching parameters
     const MAX_STEPS: u32 = 64;
-    const MIN_DISTANCE: f32 = 0.01;
+    const MIN_DISTANCE: f32 = 0.0001;
     const MAX_DISTANCE: f32 = 100.0;
-    const GLOBAL_ILLUMINATION: f32 = 0.05;
+    const GLOBAL_ILLUMINATION: f32 = 0.01;
 
     // March the ray
     var depth: f32 = 0.0;   // init depth at zero
@@ -96,8 +111,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (distance < MIN_DISTANCE) {
             // Calculate normal for shading
             let normal = get_normal(hit_position);
-            let light_dir = normalize(vec3<f32>(2.5, 1.0, 1.0));
-            let diffuse = max(0.0, dot(normal, light_dir)) * 0.8 + GLOBAL_ILLUMINATION;
+            let light_dir = normalize(vec3<f32>(0.0, 5.0, 2.0));
+            let shadow = shadow(hit_position, light_dir, 0.01, 3.0, 0.1);
+            // produces weird blending effect I don't want to investigate further
+            let diffuse = shadow * 0.8 + GLOBAL_ILLUMINATION;
 
             colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
             break;
