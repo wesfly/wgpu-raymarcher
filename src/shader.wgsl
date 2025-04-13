@@ -86,12 +86,19 @@ fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32,
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let window_size = window_dimensions.size.xy * 2;
+// Calculate aspect ratio
+    let aspect_ratio = window_dimensions.size.x / window_dimensions.size.y;
 
-    // Convert normalized screen coordinates to ray direction
-    let uv = ((in.clip_position.xy / in.clip_position.w) * 2.0 - 1.0) / window_size;
-    let ray_origin = vec3<f32>(0.0, 0.0, 0.0);
-    let ray_direction = normalize(vec3<f32>(uv.x, uv.y, 1.0));
+    // Adjust UV coordinates for aspect ratio
+    let uv = in.clip_position.xy / window_dimensions.size;
+    let adjusted_uv = vec2<f32>(
+        (uv.x - 0.5) * aspect_ratio,
+        uv.y - 0.5
+    );
+
+    // Create ray direction with corrected aspect ratio
+    let ray_origin = vec3<f32>(0.0, 0.0, -3.0);  // Moved back to see the scene better
+    let ray_direction = normalize(vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
 
     // Raymarching parameters
     const MAX_STEPS: u32 = 64;
