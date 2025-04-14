@@ -1,3 +1,6 @@
+// Great thanks to https://github.com/sotrh/learn-wgpu
+// This code is modified
+
 use std::iter;
 
 use winit::{
@@ -193,7 +196,7 @@ impl<'a> State<'a> {
 
                     // Update camera rotation
                     self.camera_rotation.0 += delta.0 * 0.01;
-                    self.camera_rotation.1 += delta.1 * 0.01;
+                    self.camera_rotation.1 += delta.1 * -0.01;
 
                     // Clamp pitch to prevent camera flipping
                     self.camera_rotation.1 = self

@@ -2,14 +2,14 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
 };
 
-struct WindowDimensions {
+struct Properties {
     size: vec2<f32>,
     time: f32,
     camera_yaw: f32,
     camera_pitch: f32,
 }
 
-var<push_constant> window_dimensions: WindowDimensions;
+var<push_constant> window_dimensions: Properties;
 
 @vertex
 fn vs_main(
