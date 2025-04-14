@@ -2,7 +2,7 @@
 
 A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in **Rust** and **WGSL**. This project is a work in progress, exploring raymarching techniques and leveraging the power of modern GPU rendering.
 
-![Image](screenshots/spheres.png)
+![Image](screenshots/screenshot.png)
 
 ## Features
 
