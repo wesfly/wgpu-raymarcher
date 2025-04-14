@@ -1,6 +1,3 @@
-// Great thanks to https://github.com/sotrh/learn-wgpu
-// This code is modified
-
 use std::iter;
 
 use winit::{
@@ -21,14 +18,13 @@ struct State<'a> {
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     window: &'a Window,
+    start_time: std::time::Instant,
 }
 
 impl<'a> State<'a> {
     async fn new(window: &'a Window) -> State<'a> {
         let size = window.inner_size();
 
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
@@ -53,19 +49,17 @@ impl<'a> State<'a> {
                 &wgpu::DeviceDescriptor {
                     label: None,
                     required_features: wgpu::Features::PUSH_CONSTANTS,
-                    // WebGL doesn't support all of wgpu's features, so if
-                    // we're building for the web we'll have to disable some.
                     required_limits: if cfg!(target_arch = "wasm32") {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
                         wgpu::Limits {
-                            max_push_constant_size: 256, // bytes
+                            max_push_constant_size: 256,
                             ..Default::default()
                         }
                     },
                     memory_hints: Default::default(),
                 },
-                None, // Trace path
+                None,
             )
             .await
             .unwrap();
@@ -78,6 +72,7 @@ impl<'a> State<'a> {
             .copied()
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -100,7 +95,7 @@ impl<'a> State<'a> {
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<[f32; 2]>() as u32,
+                    range: 0..std::mem::size_of::<[f32; 3]>() as u32,
                 }],
             });
 
@@ -145,6 +140,8 @@ impl<'a> State<'a> {
             cache: None,
         });
 
+        surface.configure(&device, &config);
+
         Self {
             surface,
             device,
@@ -153,6 +150,7 @@ impl<'a> State<'a> {
             config,
             render_pipeline,
             window,
+            start_time: std::time::Instant::now(),
         }
     }
 
@@ -196,7 +194,7 @@ impl<'a> State<'a> {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 1.0,
+                            r: 0.0,
                             g: 0.0,
                             b: 0.0,
                             a: 1.0,
@@ -208,11 +206,18 @@ impl<'a> State<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            let elapsed = self.start_time.elapsed().as_secs_f32();
+
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 0,
-                bytemuck::cast_slice(&[self.config.height as f32, self.config.height as f32]),
+                bytemuck::cast_slice(&[
+                    self.config.height as f32,
+                    self.config.height as f32,
+                    elapsed,
+                ]),
             );
             render_pass.draw(0..6, 0..1);
         }
@@ -244,8 +249,6 @@ pub async fn run() {
 
     #[cfg(target_arch = "wasm32")]
     {
-        // Winit prevents sizing with CSS, so we have to set
-        // the size manually when on web.
         use winit::dpi::PhysicalSize;
         let _ = window.request_inner_size(PhysicalSize::new(650, 400));
 
@@ -261,68 +264,60 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    // State::new uses async code, so we're going to wait for it to finish
     let mut state = State::new(&window).await;
     let mut surface_configured = false;
 
     event_loop
-        .run(move |event, control_flow| {
-            match event {
-                Event::WindowEvent {
-                    ref event,
-                    window_id,
-                } if window_id == state.window().id() => {
-                    if !state.input(event) {
-                        match event {
-                            WindowEvent::CloseRequested
-                            | WindowEvent::KeyboardInput {
-                                event:
-                                    KeyEvent {
-                                        state: ElementState::Pressed,
-                                        physical_key: PhysicalKey::Code(KeyCode::Escape),
-                                        ..
-                                    },
-                                ..
-                            } => control_flow.exit(),
-                            WindowEvent::Resized(physical_size) => {
-                                surface_configured = true;
-                                state.resize(*physical_size);
-                            }
-                            WindowEvent::RedrawRequested => {
-                                // This tells winit that we want another frame after this one
-                                state.window().request_redraw();
-
-                                if !surface_configured {
-                                    return;
-                                }
-
-                                state.update();
-                                match state.render() {
-                                    Ok(_) => {}
-                                    // Reconfigure the surface if it's lost or outdated
-                                    Err(
-                                        wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated,
-                                    ) => state.resize(state.size),
-                                    // The system is out of memory, we should probably quit
-                                    Err(
-                                        wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other,
-                                    ) => {
-                                        log::error!("OutOfMemory");
-                                        control_flow.exit();
-                                    }
-
-                                    // This happens when the a frame takes too long to present
-                                    Err(wgpu::SurfaceError::Timeout) => {
-                                        log::warn!("Surface timeout")
-                                    }
-                                }
-                            }
-                            _ => {}
+        .run(move |event, control_flow| match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == state.window().id() => {
+                if !state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested
+                        | WindowEvent::KeyboardInput {
+                            event:
+                                KeyEvent {
+                                    state: ElementState::Pressed,
+                                    physical_key: PhysicalKey::Code(KeyCode::Escape),
+                                    ..
+                                },
+                            ..
+                        } => control_flow.exit(),
+                        WindowEvent::Resized(physical_size) => {
+                            surface_configured = true;
+                            state.resize(*physical_size);
                         }
+                        WindowEvent::RedrawRequested => {
+                            state.window().request_redraw();
+
+                            if !surface_configured {
+                                return;
+                            }
+
+                            state.update();
+                            match state.render() {
+                                Ok(_) => {}
+                                Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                                    state.resize(state.size)
+                                }
+                                Err(
+                                    wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other,
+                                ) => {
+                                    log::error!("OutOfMemory");
+                                    control_flow.exit();
+                                }
+                                Err(wgpu::SurfaceError::Timeout) => {
+                                    log::warn!("Surface timeout")
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                _ => {}
             }
+            _ => {}
         })
         .unwrap();
 }
