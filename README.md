@@ -4,6 +4,10 @@ A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in *
 
 ![Image](screenshots/spheres.png)
 
+## Features
+
+- Light and Shadow
+
 ## Installation
 
 1. Clone the repository:
