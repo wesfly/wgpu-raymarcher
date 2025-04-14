@@ -7,6 +7,7 @@ A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in *
 ## Features
 
 - Light and Shadow
+- Camera controls
 
 ## Installation
 
