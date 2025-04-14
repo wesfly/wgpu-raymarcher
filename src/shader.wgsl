@@ -1,4 +1,3 @@
-// shader.wgsl
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
 };
@@ -6,6 +5,8 @@ struct VertexOutput {
 struct WindowDimensions {
     size: vec2<f32>,
     time: f32,
+    camera_yaw: f32,
+    camera_pitch: f32,
 }
 
 var<push_constant> window_dimensions: WindowDimensions;
@@ -35,7 +36,7 @@ fn vs_main(
 }
 
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
-    const EPSILON: f32 = 0.001;
+    const EPSILON: f32 = 0.0001;
     return normalize(vec3<f32>(
         scene_sdf(vec3<f32>(p.x + EPSILON, p.y, p.z)) - scene_sdf(vec3<f32>(p.x - EPSILON, p.y, p.z)),
         scene_sdf(vec3<f32>(p.x, p.y + EPSILON, p.z)) - scene_sdf(vec3<f32>(p.x, p.y - EPSILON, p.z)),
@@ -50,14 +51,12 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
 fn scene_sdf(p: vec3<f32>) -> f32 {
     let time = window_dimensions.time;
 
-    // First sphere: circular motion
     let sphere1_pos = vec3<f32>(
         sin(time) * 1.0,
         cos(time) * 1.0,
         2.0
     );
 
-    // Second sphere: more complex motion
     let sphere2_pos = vec3<f32>(
         cos(time * 0.5) * 1.5,
         sin(time * 0.7) * 0.8,
@@ -76,7 +75,7 @@ fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32,
     for (var i: u32 = 0; i < 256 && t < maxt; i++) {
         let h = scene_sdf(ray_origin + ray_direction * t);
         res = min(res, h/(light_size * t));
-        t += clamp(h, 0.005, 0.5);
+        t += clamp(h, 0.001, 0.2); // Adjusted from 0.005, 0.5
         if(res < -1.0 || t > maxt) { break; }
     }
     res = max(res, -1.0);
@@ -92,13 +91,37 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         (uv.y - 0.5) * aspect_ratio
     );
 
-    let ray_origin = vec3<f32>(0.0, 0.0, -3.0);
-    let ray_direction = normalize(vec3<f32>(adjusted_uv.x, adjusted_uv.y, 2.0));
+    // Create rotation matrices
+    let cos_yaw = cos(window_dimensions.camera_yaw);
+    let sin_yaw = sin(window_dimensions.camera_yaw);
+    let cos_pitch = cos(window_dimensions.camera_pitch);
+    let sin_pitch = sin(window_dimensions.camera_pitch);
 
-    const MAX_STEPS: u32 = 64;
+    // Create rotation matrix
+    let rotation_y = mat3x3<f32>(
+        cos_yaw, 0.0, -sin_yaw,
+        0.0, 1.0, 0.0,
+        sin_yaw, 0.0, cos_yaw
+    );
+
+    let rotation_x = mat3x3<f32>(
+        1.0, 0.0, 0.0,
+        0.0, cos_pitch, sin_pitch,
+        0.0, -sin_pitch, cos_pitch
+    );
+
+    // Apply rotation to both ray origin and direction
+    let base_ray_direction = vec3<f32>(adjusted_uv.x, adjusted_uv.y, 2.0);
+    let rotated_direction = rotation_y * rotation_x * base_ray_direction;
+    let ray_direction = normalize(rotated_direction);
+
+    let base_ray_origin = vec3<f32>(0.0, 0.0, -3.0);
+    let ray_origin = rotation_y * rotation_x * base_ray_origin;
+
+    const MAX_STEPS: u32 = 128;
     const MIN_DISTANCE: f32 = 0.0001;
     const MAX_DISTANCE: f32 = 100.0;
-    const GLOBAL_ILLUMINATION: f32 = 0.01;
+    const GLOBAL_ILLUMINATION: f32 = 0.1;
 
     var depth: f32 = 0.0;
     var hit_position: vec3<f32>;
@@ -111,8 +134,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (distance < MIN_DISTANCE) {
             let normal = get_normal(hit_position);
             let light_dir = normalize(vec3<f32>(0.0, 5.0, 2.0));
-            let shadow = shadow(hit_position, light_dir, 0.01, 3.0, 0.1);
-            let diffuse = shadow * 0.8 + GLOBAL_ILLUMINATION;
+            let shadow = shadow(hit_position, light_dir, 0.001, 3.0, 0.1); // Adjusted mint from 0.01
+            let diffuse = shadow * 0.9 + GLOBAL_ILLUMINATION; // Adjusted from 0.8
 
             colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
             break;
@@ -120,7 +143,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         depth += distance;
         if (depth >= MAX_DISTANCE) {
-            colour = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+            colour = vec4<f32>(0.1, 0.2, 0.3, 1.0);
             break;
         }
     }

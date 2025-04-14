@@ -19,6 +19,9 @@ struct State<'a> {
     render_pipeline: wgpu::RenderPipeline,
     window: &'a Window,
     start_time: std::time::Instant,
+    mouse_pressed: bool,
+    mouse_position: (f32, f32),
+    camera_rotation: (f32, f32), // (yaw, pitch)
 }
 
 impl<'a> State<'a> {
@@ -95,7 +98,7 @@ impl<'a> State<'a> {
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<[f32; 3]>() as u32,
+                    range: 0..std::mem::size_of::<[f32; 5]>() as u32,
                 }],
             });
 
@@ -151,6 +154,9 @@ impl<'a> State<'a> {
             render_pipeline,
             window,
             start_time: std::time::Instant::now(),
+            mouse_pressed: false,
+            mouse_position: (0.0, 0.0),
+            camera_rotation: (0.0, 0.0),
         }
     }
 
@@ -167,9 +173,40 @@ impl<'a> State<'a> {
         }
     }
 
-    #[allow(unused_variables)]
     fn input(&mut self, event: &WindowEvent) -> bool {
-        false
+        match event {
+            WindowEvent::MouseInput {
+                state,
+                button: MouseButton::Left,
+                ..
+            } => {
+                self.mouse_pressed = *state == ElementState::Pressed;
+                true
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                if self.mouse_pressed {
+                    let new_pos = (position.x as f32, position.y as f32);
+                    let delta = (
+                        new_pos.0 - self.mouse_position.0,
+                        new_pos.1 - self.mouse_position.1,
+                    );
+
+                    // Update camera rotation
+                    self.camera_rotation.0 += delta.0 * 0.01;
+                    self.camera_rotation.1 += delta.1 * 0.01;
+
+                    // Clamp pitch to prevent camera flipping
+                    self.camera_rotation.1 = self
+                        .camera_rotation
+                        .1
+                        .max(-std::f32::consts::PI / 2.0 + 0.1)
+                        .min(std::f32::consts::PI / 2.0 - 0.1);
+                }
+                self.mouse_position = (position.x as f32, position.y as f32);
+                true
+            }
+            _ => false,
+        }
     }
 
     fn update(&mut self) {}
@@ -217,6 +254,8 @@ impl<'a> State<'a> {
                     self.config.height as f32,
                     self.config.height as f32,
                     elapsed,
+                    self.camera_rotation.0,
+                    self.camera_rotation.1,
                 ]),
             );
             render_pass.draw(0..6, 0..1);
