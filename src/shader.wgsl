@@ -133,9 +133,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         if (distance < MIN_DISTANCE) {
             let normal = get_normal(hit_position);
-            let light_dir = normalize(vec3<f32>(0.0, 5.0, 2.0));
-            let shadow = shadow(hit_position, light_dir, 0.001, 3.0, 0.1); // Adjusted mint from 0.01
-            let diffuse = shadow * 0.9 + GLOBAL_ILLUMINATION; // Adjusted from 0.8
+            let light_dir = normalize(vec3<f32>(0.0, -5.0, 0.0));
+            let shadow = shadow(hit_position, light_dir, 0.1, 3.0, 0.1);
+            let diffuse = shadow * 0.9 + GLOBAL_ILLUMINATION;
 
             colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
             break;
@@ -143,7 +143,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         depth += distance;
         if (depth >= MAX_DISTANCE) {
-            colour = vec4<f32>(0.1, 0.2, 0.3, 1.0);
+            colour = vec4<f32>(0.3, 0.5, 0.8, 1.0);
             break;
         }
     }
