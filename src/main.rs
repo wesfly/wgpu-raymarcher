@@ -1,4 +1,4 @@
-// real magic happens in lib.rs and model.rs
+// real magic happens in lib.rs and shader.wgsl
 
 use wgpu_raymarching::run;
 
