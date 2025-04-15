@@ -48,6 +48,10 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
     return length(p) - radius;
 }
 
+// fn plane_sdf(p: vec3<f32>, n: vec3<f32>, h: f32) -> f32{
+//     return dot(p,n) + h;
+// }
+
 fn map_scene(p: vec3<f32>) -> f32 {
     let displacement = sin(10.0 * p.x) * sin(10.0 * p.y) * sin(10.0 * p.z) * 0.05;
     let time = window_dimensions.time;
@@ -83,7 +87,7 @@ fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32,
     return 0.25*(1.0+res) * (1.0 + res) * (2.0 - res);
 }
 
-fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
+fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     const MAX_STEPS: u32 = 128;
     const MIN_DISTANCE: f32 = 0.0001;
     const MAX_DISTANCE: f32 = 100.0;
@@ -91,7 +95,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
 
     var distance_travelled: f32 = 0.0;
     var current_position: vec3<f32>;
-    var colour: vec4<f32>;
+    var colour: vec3<f32>;
     var light_position: vec3<f32> = vec3<f32>(-3.0, -5.0, 0.0);
 
     for (var i: u32 = 0; i < MAX_STEPS; i++) {
@@ -106,13 +110,13 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
             let diffuse = shadow * 1.0 + GLOBAL_ILLUMINATION;
 
             // colours don't show correctly because of linear colour spaces
-            colour = vec4<f32>(vec3<f32>(diffuse * 0.93, diffuse * 0.12, diffuse * 0.12), 1.0);
+            colour = vec3<f32>(diffuse * 0.93, diffuse * 0.12, diffuse * 0.12);
             break;
         }
 
         distance_travelled += distance_to_scene;
         if (distance_travelled >= MAX_DISTANCE) {
-            colour = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+            colour = vec3<f32>(0.0, 0.0, 0.0);
             break;
         }
     }
@@ -156,5 +160,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let colour = raymarch(ray_origin, ray_direction);
 
-    return colour;
+    let output = vec4<f32>(vec3<f32>(colour), 1.0);
+
+    return output;
 }
