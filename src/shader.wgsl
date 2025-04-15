@@ -38,9 +38,9 @@ fn vs_main(
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
     const EPSILON: f32 = 0.0001;
     return normalize(vec3<f32>(
-        scene_sdf(vec3<f32>(p.x + EPSILON, p.y, p.z)) - scene_sdf(vec3<f32>(p.x - EPSILON, p.y, p.z)),
-        scene_sdf(vec3<f32>(p.x, p.y + EPSILON, p.z)) - scene_sdf(vec3<f32>(p.x, p.y - EPSILON, p.z)),
-        scene_sdf(vec3<f32>(p.x, p.y, p.z + EPSILON)) - scene_sdf(vec3<f32>(p.x, p.y, p.z - EPSILON)),
+        map_scene(vec3<f32>(p.x + EPSILON, p.y, p.z)) - map_scene(vec3<f32>(p.x - EPSILON, p.y, p.z)),
+        map_scene(vec3<f32>(p.x, p.y + EPSILON, p.z)) - map_scene(vec3<f32>(p.x, p.y - EPSILON, p.z)),
+        map_scene(vec3<f32>(p.x, p.y, p.z + EPSILON)) - map_scene(vec3<f32>(p.x, p.y, p.z - EPSILON)),
     ));
 }
 
@@ -48,7 +48,8 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
     return length(p) - radius;
 }
 
-fn scene_sdf(p: vec3<f32>) -> f32 {
+fn map_scene(p: vec3<f32>) -> f32 {
+    let displacement = sin(10.0 * p.x) * sin(10.0 * p.y) * sin(10.0 * p.z) * 0.1;
     let time = window_dimensions.time;
 
     let sphere1_pos = vec3<f32>(
@@ -66,20 +67,54 @@ fn scene_sdf(p: vec3<f32>) -> f32 {
     let sphere = sphere_sdf(p - sphere1_pos, 0.2);
     let sphere2 = sphere_sdf(p - sphere2_pos, 0.5);
 
-    return min(sphere, sphere2);
+    return min(sphere + displacement, sphere2 + displacement);
 }
 
 fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32, light_size: f32) -> f32 {
     var res: f32 = 1.0;
     var t: f32 = mint;
     for (var i: u32 = 0; i < 256 && t < maxt; i++) {
-        let h = scene_sdf(ray_origin + ray_direction * t);
+        let h = map_scene(ray_origin + ray_direction * t);
         res = min(res, h/(light_size * t));
         t += clamp(h, 0.001, 0.2); // Adjusted from 0.005, 0.5
         if(res < -1.0 || t > maxt) { break; }
     }
     res = max(res, -1.0);
     return 0.25*(1.0+res) * (1.0 + res) * (2.0 - res);
+}
+
+fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
+    const MAX_STEPS: u32 = 128;
+    const MIN_DISTANCE: f32 = 0.0001;
+    const MAX_DISTANCE: f32 = 100.0;
+    const GLOBAL_ILLUMINATION: f32 = 0.0;
+
+    var depth: f32 = 0.0;
+    var hit_position: vec3<f32>;
+    var colour: vec4<f32>;
+
+    for (var i: u32 = 0; i < MAX_STEPS; i++) {
+        hit_position = ray_origin + ray_direction * depth;
+        let distance = map_scene(hit_position);
+
+        if (distance < MIN_DISTANCE) {
+            let normal = get_normal(hit_position);
+            let light_dir = normalize(vec3<f32>(0.0, -5.0, 0.0));
+            let shadow = shadow(hit_position, light_dir, 0.1, 3.0, 0.256);
+            let diffuse = shadow * 1.0 + GLOBAL_ILLUMINATION;
+
+            colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
+            break;
+        }
+
+        depth += distance;
+        if (depth >= MAX_DISTANCE) {
+            colour = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+            break;
+        }
+    }
+
+    return colour;
 }
 
 @fragment
@@ -118,35 +153,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let base_ray_origin = vec3<f32>(0.0, 0.0, -3.0);
     let ray_origin = rotation_y * rotation_x * base_ray_origin;
 
-    const MAX_STEPS: u32 = 128;
-    const MIN_DISTANCE: f32 = 0.0001;
-    const MAX_DISTANCE: f32 = 100.0;
-    const GLOBAL_ILLUMINATION: f32 = 0.1;
-
-    var depth: f32 = 0.0;
-    var hit_position: vec3<f32>;
-    var colour: vec4<f32>;
-
-    for (var i: u32 = 0; i < MAX_STEPS; i++) {
-        hit_position = ray_origin + ray_direction * depth;
-        let distance = scene_sdf(hit_position);
-
-        if (distance < MIN_DISTANCE) {
-            let normal = get_normal(hit_position);
-            let light_dir = normalize(vec3<f32>(0.0, -5.0, 0.0));
-            let shadow = shadow(hit_position, light_dir, 0.1, 3.0, 0.1);
-            let diffuse = shadow * 0.9 + GLOBAL_ILLUMINATION;
-
-            colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
-            break;
-        }
-
-        depth += distance;
-        if (depth >= MAX_DISTANCE) {
-            colour = vec4<f32>(0.3, 0.5, 0.8, 1.0);
-            break;
-        }
-    }
-
+    let colour = raymarch(ray_origin, ray_direction);
     return colour;
 }
