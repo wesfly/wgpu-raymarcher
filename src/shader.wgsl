@@ -49,7 +49,7 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
 }
 
 fn map_scene(p: vec3<f32>) -> f32 {
-    let displacement = sin(10.0 * p.x) * sin(10.0 * p.y) * sin(10.0 * p.z) * 0.1;
+    let displacement = sin(10.0 * p.x) * sin(10.0 * p.y) * sin(10.0 * p.z) * 0.05;
     let time = window_dimensions.time;
 
     let sphere1_pos = vec3<f32>(
@@ -89,26 +89,28 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
     const MAX_DISTANCE: f32 = 100.0;
     const GLOBAL_ILLUMINATION: f32 = 0.0;
 
-    var depth: f32 = 0.0;
-    var hit_position: vec3<f32>;
+    var distance_travelled: f32 = 0.0;
+    var current_position: vec3<f32>;
     var colour: vec4<f32>;
+    var light_position: vec3<f32> = vec3<f32>(-3.0, -5.0, 0.0);
 
     for (var i: u32 = 0; i < MAX_STEPS; i++) {
-        hit_position = ray_origin + ray_direction * depth;
-        let distance = map_scene(hit_position);
+        current_position = ray_origin + ray_direction * distance_travelled;
+        let distance_to_scene = map_scene(current_position);
 
-        if (distance < MIN_DISTANCE) {
-            let normal = get_normal(hit_position);
-            let light_dir = normalize(vec3<f32>(0.0, -5.0, 0.0));
-            let shadow = shadow(hit_position, light_dir, 0.1, 3.0, 0.256);
+        if (distance_to_scene < MIN_DISTANCE) {
+            let normal = get_normal(current_position);
+            let light_dir = normalize(light_position);
+            let shadow = shadow(current_position, light_dir, 0.1, 3.0, 0.256);
             let diffuse = shadow * 1.0 + GLOBAL_ILLUMINATION;
 
-            colour = vec4<f32>(vec3<f32>(diffuse), 1.0);
+            // colours don't show correctly because of linear colour spaces
+            colour = vec4<f32>(vec3<f32>(diffuse * 0.93, diffuse * 0.68, diffuse * 0.29), 1.0);
             break;
         }
 
-        depth += distance;
-        if (depth >= MAX_DISTANCE) {
+        distance_travelled += distance_to_scene;
+        if (distance_travelled >= MAX_DISTANCE) {
             colour = vec4<f32>(0.0, 0.0, 0.0, 1.0);
             break;
         }
