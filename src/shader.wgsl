@@ -71,12 +71,12 @@ fn map_scene(p: vec3<f32>) -> f32 {
 }
 
 fn shadow(ray_origin: vec3<f32>, ray_direction: vec3<f32>, mint: f32, maxt: f32, light_size: f32) -> f32 {
-    var res: f32 = 1.0;
+    var res: f32 = 1.2;
     var t: f32 = mint;
     for (var i: u32 = 0; i < 256 && t < maxt; i++) {
         let h = map_scene(ray_origin + ray_direction * t);
         res = min(res, h/(light_size * t));
-        t += clamp(h, 0.001, 0.2); // Adjusted from 0.005, 0.5
+        t += clamp(h, 0.001, 0.2);
         if(res < -1.0 || t > maxt) { break; }
     }
     res = max(res, -1.0);
@@ -87,7 +87,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
     const MAX_STEPS: u32 = 128;
     const MIN_DISTANCE: f32 = 0.0001;
     const MAX_DISTANCE: f32 = 100.0;
-    const GLOBAL_ILLUMINATION: f32 = 0.0;
+    const GLOBAL_ILLUMINATION: f32 = 0.2;
 
     var distance_travelled: f32 = 0.0;
     var current_position: vec3<f32>;
@@ -102,10 +102,11 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec4<f32> {
             let normal = get_normal(current_position);
             let light_dir = normalize(light_position);
             let shadow = shadow(current_position, light_dir, 0.1, 3.0, 0.256);
+
             let diffuse = shadow * 1.0 + GLOBAL_ILLUMINATION;
 
             // colours don't show correctly because of linear colour spaces
-            colour = vec4<f32>(vec3<f32>(diffuse * 0.93, diffuse * 0.68, diffuse * 0.29), 1.0);
+            colour = vec4<f32>(vec3<f32>(diffuse * 0.93, diffuse * 0.12, diffuse * 0.12), 1.0);
             break;
         }
 
@@ -128,13 +129,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         (uv.y - 0.5) * aspect_ratio
     );
 
-    // Create rotation matrices
     let cos_yaw = cos(window_dimensions.camera_yaw);
     let sin_yaw = sin(window_dimensions.camera_yaw);
     let cos_pitch = cos(window_dimensions.camera_pitch);
     let sin_pitch = sin(window_dimensions.camera_pitch);
 
-    // Create rotation matrix
     let rotation_y = mat3x3<f32>(
         cos_yaw, 0.0, -sin_yaw,
         0.0, 1.0, 0.0,
@@ -156,5 +155,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_origin = rotation_y * rotation_x * base_ray_origin;
 
     let colour = raymarch(ray_origin, ray_direction);
+
     return colour;
 }
