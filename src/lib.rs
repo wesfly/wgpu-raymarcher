@@ -1,7 +1,10 @@
 // Great thanks to https://github.com/sotrh/learn-wgpu
 // This code is modified
 
-use std::iter;
+use std::{
+    iter,
+    time::{Duration, Instant},
+};
 
 use winit::{
     event::*,
@@ -28,6 +31,9 @@ struct State<'a> {
     frame_count: u32,
     last_fps_update: std::time::Instant,
     fps: f64,
+    fps_cap_enabled: bool,
+    target_fps: u32,
+    last_frame_time: Instant,
 }
 
 impl<'a> State<'a> {
@@ -166,6 +172,9 @@ impl<'a> State<'a> {
             frame_count: 0,
             last_fps_update: std::time::Instant::now(),
             fps: 0.0,
+            fps_cap_enabled: true,
+            target_fps: 60,
+            last_frame_time: Instant::now(),
         }
     }
 
@@ -214,13 +223,73 @@ impl<'a> State<'a> {
                 self.mouse_position = (position.x as f32, position.y as f32);
                 true
             }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        physical_key: PhysicalKey::Code(key),
+                        ..
+                    },
+                ..
+            } => {
+                match key {
+                    // Toggle FPS cap with the F key
+                    KeyCode::KeyF => {
+                        self.fps_cap_enabled = !self.fps_cap_enabled;
+                        log::info!(
+                            "FPS cap {} (target: {} FPS)",
+                            if self.fps_cap_enabled {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            },
+                            self.target_fps
+                        );
+
+                        // Update the window title to show the cap status
+                        self.update_window_title();
+
+                        true
+                    }
+                    _ => false,
+                }
+            }
             _ => false,
         }
     }
 
     fn update(&mut self) {}
 
+    fn update_window_title(&self) {
+        let cap_status = if self.fps_cap_enabled {
+            format!("(capped at {} FPS)", self.target_fps)
+        } else {
+            "(uncapped)".to_string()
+        };
+
+        self.window.set_title(&format!(
+            "{} - FPS: {:.1} {}",
+            env!("CARGO_PKG_NAME"),
+            self.fps,
+            cap_status
+        ));
+    }
+
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        // If FPS cap is enabled, wait until the next frame should be rendered
+        if self.fps_cap_enabled {
+            let frame_duration = Duration::from_secs_f64(1.0 / self.target_fps as f64);
+            let elapsed = self.last_frame_time.elapsed();
+
+            if elapsed < frame_duration {
+                // Sleep for the remaining time
+                let sleep_duration = frame_duration - elapsed;
+                std::thread::sleep(sleep_duration);
+            }
+
+            self.last_frame_time = Instant::now();
+        }
+
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -284,12 +353,7 @@ impl<'a> State<'a> {
             self.frame_count = 0;
             self.last_fps_update = now;
 
-            // Update window title with FPS
-            self.window.set_title(&format!(
-                "{} - FPS: {:.1}",
-                env!("CARGO_PKG_NAME"),
-                self.fps
-            ));
+            self.update_window_title();
         }
 
         Ok(())
