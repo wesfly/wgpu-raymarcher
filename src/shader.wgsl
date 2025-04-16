@@ -162,15 +162,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         0.0, cos_pitch, sin_pitch,
         0.0, -sin_pitch, cos_pitch
     );
+    
+    let camera_pos = vec3<f32>(0.0, 0.0, -3.0);
 
-    let base_ray_direction = vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0);
-    let rotated_direction = rotation_y * rotation_x * base_ray_direction;
-    let ray_direction = normalize(rotated_direction);
+    let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
 
-    let base_ray_origin = vec3<f32>(0.0, 0.0, -3.0);
-    let ray_origin = rotation_y * rotation_x * base_ray_origin;
-
-    let color = raymarch(ray_origin, ray_direction);
+    let color = raymarch(camera_pos, ray_direction);
 
     return vec4<f32>(color, 1.0);
 }
