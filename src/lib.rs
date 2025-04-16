@@ -25,6 +25,9 @@ struct State<'a> {
     mouse_pressed: bool,
     mouse_position: (f32, f32),
     camera_rotation: (f32, f32), // (yaw, pitch)
+    frame_count: u32,
+    last_fps_update: std::time::Instant,
+    fps: f64,
 }
 
 impl<'a> State<'a> {
@@ -160,6 +163,9 @@ impl<'a> State<'a> {
             mouse_pressed: false,
             mouse_position: (0.0, 0.0),
             camera_rotation: (0.0, 0.0),
+            frame_count: 0,
+            last_fps_update: std::time::Instant::now(),
+            fps: 0.0,
         }
     }
 
@@ -266,6 +272,25 @@ impl<'a> State<'a> {
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
+
+        // Update FPS counter
+        self.frame_count += 1;
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(self.last_fps_update);
+
+        // Update FPS approximately once per second
+        if elapsed.as_secs_f64() > 0.1 {
+            self.fps = self.frame_count as f64 / elapsed.as_secs_f64();
+            self.frame_count = 0;
+            self.last_fps_update = now;
+
+            // Update window title with FPS
+            self.window.set_title(&format!(
+                "{} - FPS: {:.1}",
+                env!("CARGO_PKG_NAME"),
+                self.fps
+            ));
+        }
 
         Ok(())
     }
