@@ -50,6 +50,11 @@ fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
     return length(p) - radius;
 }
 
+fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
+    let q = abs(p) - b;
+    return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
 fn map_scene(p: vec3<f32>) -> f32 {
     let displacement = sin(5.0 * p.x) * sin(5.0 * p.y) * sin(5.0 * p.z) * 0.25;
     let time = window_dimensions.time;
@@ -69,8 +74,9 @@ fn map_scene(p: vec3<f32>) -> f32 {
     let ground = -p.y + 1.5;
     let sphere1 = sphere_sdf(p - sphere1_pos, 0.5);
     let sphere2 = sphere_sdf(p - sphere2_pos, 0.7);
+    let box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
 
-    return min(min(sphere1 + displacement, sphere2 + displacement), ground);
+    return min(min(min(sphere1 + displacement, sphere2 + displacement), ground), box);
 }
 
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f32 {
@@ -91,7 +97,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
 
 fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var t: f32 = 0.0;
-    const MAX_STEPS: i32 = 128; // higher value will eliminate no-hit artifacts
+    const MAX_STEPS: i32 = 512; // higher value will eliminate no-hit artifacts
     const MAX_DIST: f32 = 100.0;
     const EPSILON: f32 = 0.001;
 
@@ -109,7 +115,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
             let light_dist = length(light_pos - p);
 
             // Ambient
-            let ambient = 0.1;
+            let ambient = 0.075;
 
             // Diffuse
             let diff = max(dot(normal, light_dir), 0.0);
@@ -118,7 +124,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
             let shadow = soft_shadow(p, light_dir, 0.1, light_dist, 16.0);
 
             // Material color
-            let material_color = vec3<f32>(0.9, 0.2, 0.2);
+            let material_color = vec3<f32>(0.9, 0.9, 0.9);
 
             // Final color calculation
             let final_color = material_color * (ambient + diff * shadow);
@@ -134,7 +140,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     }
 
     // Return background color if no hit
-    return vec3<f32>(0.1, 0.1, 0.1);
+    return vec3<f32>(0.0, 0.0, 0.0);
 }
 
 @fragment
