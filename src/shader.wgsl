@@ -35,14 +35,30 @@ fn vs_main(
     return out;
 }
 
+// Object info structure
+struct SceneObject {
+    dist: f32,
+    id: i32,
+}
+
+// Helper function to update closest object
+fn update_closest(current: SceneObject, new_dist: f32, new_id: i32) -> SceneObject {
+    var result = current;
+    if (new_dist < current.dist) {
+        result.dist = new_dist;
+        result.id = new_id;
+    }
+    return result;
+}
+
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
     const EPSILON: f32 = 0.001;
     let e = vec2<f32>(EPSILON, 0.0);
 
     return normalize(vec3<f32>(
-        map_scene(p + e.xyy) - map_scene(p - e.xyy),
-        map_scene(p + e.yxy) - map_scene(p - e.yxy),
-        map_scene(p + e.yyx) - map_scene(p - e.yyx)
+        map_scene(p + e.xyy).dist - map_scene(p - e.xyy).dist,
+        map_scene(p + e.yxy).dist - map_scene(p - e.yxy).dist,
+        map_scene(p + e.yyx).dist - map_scene(p - e.yyx).dist
     ));
 }
 
@@ -55,28 +71,74 @@ fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
     return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-fn map_scene(p: vec3<f32>) -> f32 {
+fn map_scene(p: vec3<f32>) -> SceneObject {
     let displacement = sin(5.0 * p.x) * sin(5.0 * p.y) * sin(5.0 * p.z) * 0.25;
     let time = window_dimensions.time;
 
+    // Initialize with "infinity" and no object
+    var closest: SceneObject;
+    closest.dist = 1000000.0;
+    closest.id = 0;
+
+    // ID counter - starts at 1
+    var next_id: i32 = 1;
+
+    // Sphere 1
     let sphere1_pos = vec3<f32>(
         sin(time) * 1.0,
         cos(time) * 1.0,
         2.0
     );
+    let sphere1 = sphere_sdf(p - sphere1_pos, 0.5) + displacement;
+    closest = update_closest(closest, sphere1, next_id);
+    next_id += 1;
 
     let sphere2_pos = vec3<f32>(
         cos(time * 0.5) * 1.5,
         sin(time * 0.7) * 0.8,
         2.0 + sin(time) * 0.5
     );
+    let sphere2 = sphere_sdf(p - sphere2_pos, 0.7) + displacement;
+    closest = update_closest(closest, sphere2, next_id);
+    next_id += 1;
 
+    // Ground
     let ground = -p.y + 1.5;
-    let sphere1 = sphere_sdf(p - sphere1_pos, 0.5);
-    let sphere2 = sphere_sdf(p - sphere2_pos, 0.7);
-    let box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
+    closest = update_closest(closest, ground, next_id);
+    next_id += 1;
 
-    return min(min(min(sphere1 + displacement, sphere2 + displacement), ground), box);
+    // Box
+    let box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
+    closest = update_closest(closest, box, next_id);
+    // next_id += 1; // Uncomment if you add more objects
+
+    return closest;
+}
+
+fn get_material_color(object_id: i32, p: vec3<f32>) -> vec3<f32> {
+    switch(object_id) {
+        case 1: {
+            return vec3<f32>(1.0, 0.2, 0.2); // Red sphere 1
+        }
+        case 2: {
+            return vec3<f32>(0.2, 1.0, 0.2); // Green sphere 2
+        }
+        case 3: {
+            // Checkerboard pattern for the ground
+            let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
+            return mix(
+                vec3<f32>(0.8, 0.8, 0.8),  // Light gray
+                vec3<f32>(0.2, 0.2, 0.2),  // Dark gray
+                checker
+            );
+        }
+        case 4: {
+            return vec3<f32>(0.2, 0.2, 1.0); // Blue box
+        }
+        default: {
+            return vec3<f32>(1.0, 1.0, 1.0); // White default
+        }
+    }
 }
 
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f32 {
@@ -84,7 +146,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
     var t = mint;
 
     for(var i: i32 = 0; i < 64 && t < maxt; i++) {
-        let h = map_scene(ro + rd * t);
+        let h = map_scene(ro + rd * t).dist;
         if(h < 0.001) {
             return 0.0;
         }
@@ -103,7 +165,8 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
 
     for(var i: i32 = 0; i < MAX_STEPS; i++) {
         let p = ray_origin + t * ray_direction;
-        let d = map_scene(p);
+        let scene_info = map_scene(p);
+        let d = scene_info.dist;
 
         if(d < EPSILON) {
             // Hit something - calculate shading
@@ -123,8 +186,8 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
             // Shadows
             let shadow = soft_shadow(p, light_dir, 0.1, light_dist, 16.0);
 
-            // Material color
-            let material_color = vec3<f32>(0.9, 0.9, 0.9);
+            // Material color based on object ID
+            let material_color = get_material_color(scene_info.id, p);
 
             // Final color calculation
             let final_color = material_color * (ambient + diff * shadow);
