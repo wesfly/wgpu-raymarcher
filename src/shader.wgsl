@@ -91,7 +91,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
 
 fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var t: f32 = 0.0;
-    const MAX_STEPS: i32 = 128;
+    const MAX_STEPS: i32 = 128; // higher value will eliminate no-hit artifacts
     const MAX_DIST: f32 = 100.0;
     const EPSILON: f32 = 0.001;
 
@@ -142,8 +142,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let aspect_ratio = window_dimensions.size.x / window_dimensions.size.y;
     let uv = in.clip_position.xy / window_dimensions.size;
     let adjusted_uv = vec2<f32>(
-        (uv.x - 0.5) * 2.0,
-        (uv.y - 0.5) * 2.0 * aspect_ratio
+        (uv.x - 0.7),
+        (uv.y - 0.5) * aspect_ratio
     );
 
     let cos_yaw = cos(window_dimensions.camera_yaw);
