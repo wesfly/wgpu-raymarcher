@@ -66,7 +66,7 @@ fn map_scene(p: vec3<f32>) -> f32 {
         2.0 + sin(time) * 0.5
     );
 
-    let ground = p.y + 1.5;
+    let ground = -p.y + 1.5;
     let sphere1 = sphere_sdf(p - sphere1_pos, 0.5);
     let sphere2 = sphere_sdf(p - sphere2_pos, 0.7);
 
@@ -104,7 +104,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
             let normal = get_normal(p);
 
             // Light properties
-            let light_pos = vec3<f32>(2.0, 4.0, -3.0);
+            let light_pos = vec3<f32>(2.0, -4.0, -3.0);
             let light_dir = normalize(light_pos - p);
             let light_dist = length(light_pos - p);
 
@@ -162,7 +162,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         0.0, cos_pitch, sin_pitch,
         0.0, -sin_pitch, cos_pitch
     );
-    
+
     let camera_pos = vec3<f32>(0.0, 0.0, -3.0);
 
     let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
