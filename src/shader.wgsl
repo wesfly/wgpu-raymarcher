@@ -36,19 +36,19 @@ fn vs_main(
 }
 
 // Object info structure
-struct SceneObject {
-    dist: f32,
-    material_id: i32,
-}
+// struct SceneObject {
+//     dist: f32,
+//     material_id: i32,
+// }
 
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
     const EPSILON: f32 = 0.001;
     let e = vec2<f32>(EPSILON, 0.0);
 
     return normalize(vec3<f32>(
-        map_scene(p + e.xyy).dist - map_scene(p - e.xyy).dist,
-        map_scene(p + e.yxy).dist - map_scene(p - e.yxy).dist,
-        map_scene(p + e.yyx).dist - map_scene(p - e.yyx).dist
+        map_scene(p + e.xyy).r - map_scene(p - e.xyy).r,
+        map_scene(p + e.yxy).r - map_scene(p - e.yxy).r,
+        map_scene(p + e.yyx).r - map_scene(p - e.yyx).r
     ));
 }
 
@@ -61,7 +61,8 @@ fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
     return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-fn map_scene(p: vec3<f32>) -> SceneObject {
+// returns distance, colour
+fn map_scene(p: vec3<f32>) -> vec4<f32> {
     let displacement = sin(5.0 * p.x) * sin(5.0 * p.y) * sin(5.0 * p.z) * 0.25;
     let time = push_constants.time;
 
@@ -83,65 +84,29 @@ fn map_scene(p: vec3<f32>) -> SceneObject {
 
     let box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
 
-    // Find the closest object in one step
-    var result: SceneObject;
-
-    // Initialize with first object (sphere1)
-    result.dist = sphere1;
-    result.material_id = 1;
-
-    // Check each object and update if it's closer
-    if (sphere2 < result.dist) {
-        result.dist = sphere2;
-        result.material_id = 2;
-    }
-
-    if (ground < result.dist) {
-        result.dist = ground;
-        result.material_id = 3;
-    }
-
-    if (box < result.dist) {
-        result.dist = box;
-        result.material_id = 4;
-    }
+    var result = vec4<f32>(min(sphere1, box), 1.0, 0.0, 1.0);
 
     return result;
 }
 
-fn get_material_color(material_id: i32, p: vec3<f32>) -> vec3<f32> {
-    switch(material_id) {
-        case 1: {
-            return vec3<f32>(1.0, 0.2, 0.2); // Red
-        }
-        case 2: {
-            return vec3<f32>(0.2, 1.0, 0.2); // Green
-        }
-        case 3: {
-            // Checkerboard pattern for the ground
-            let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
-            return mix(
-                vec3<f32>(0.8, 0.8, 0.8),  // Light gray
-                vec3<f32>(0.2, 0.2, 0.2),  // Dark gray
-                checker
-            );
-        }
-        case 4: {
-            return vec3<f32>(0.2, 0.2, 1.0); // Blue
-        }
 
-        default: {
-            return vec3<f32>(1.0, 0.0, 1.0); // Purple place default
-        }
-    }
-}
+// case 3: {
+//     // Checkerboard pattern for the ground
+//     let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
+//     return mix(
+//         vec3<f32>(0.8, 0.8, 0.8),  // Light gray
+//         vec3<f32>(0.2, 0.2, 0.2),  // Dark gray
+//         checker
+//     );
+// }
+
 
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f32 {
     var res = 1.0;
     var t = mint;
 
     for(var i: i32 = 0; i < 64 && t < maxt; i++) {
-        let h = map_scene(ro + rd * t).dist;
+        let h = map_scene(ro + rd * t).r;
         if(h < 0.001) {
             return 0.0;
         }
@@ -161,8 +126,8 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
 
     for(var i: i32 = 0; i < MAX_STEPS; i++) {
         let p = ray_origin + t * ray_direction;
-        let scene_info = map_scene(p);
-        let d = scene_info.dist;
+        let scene_info = map_scene(p).r;
+        let d = scene_info;
 
         if(d < HIT_DIST) {
             // Hit something - calculate shading
@@ -180,7 +145,8 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
             let shadow = soft_shadow(p, light_dir, 0.1, light_dist, 16.0);
 
             // Material color based on object ID
-            let material_color = get_material_color(scene_info.material_id, p);
+            // let material_color = vec3<f32>(1.0);
+            let material_color = map_scene(p).gba;
 
             // Final color calculation
             let final_color = material_color * (AMBIENT + diff * shadow);
