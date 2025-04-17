@@ -347,7 +347,6 @@ impl<'a> State<'a> {
         let now = std::time::Instant::now();
         let elapsed = now.duration_since(self.last_fps_update);
 
-        // Update FPS approximately once per second
         if elapsed.as_secs_f64() > 0.1 {
             self.fps = self.frame_count as f64 / elapsed.as_secs_f64();
             self.frame_count = 0;
