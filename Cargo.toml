@@ -12,14 +12,6 @@ wgpu = "24.0"
 pollster = "0.3"
 bytemuck = { version = "1.16", features = ["derive"] }
 
-# [target.'cfg(target_arch = "wasm32")'.dependencies]
-# console_error_panic_hook = "0.1.6"
-# console_log = "1.0"
-# wgpu = { version = "24.0", features = ["webgl"] }
-# wasm-bindgen = "0.2"
-# wasm-bindgen-futures = "0.4"
-# web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
-
 [[bin]]
 name = "wgpu_raymarching"
 path = "src/main.rs"
