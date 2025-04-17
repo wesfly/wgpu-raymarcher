@@ -4,12 +4,12 @@ struct VertexOutput {
 
 struct Properties {
     size: vec2<f32>,
-    time: f32,
+    time: f32,          // Time elapsed
     camera_yaw: f32,
     camera_pitch: f32,
 }
 
-var<push_constant> window_dimensions: Properties;
+var<push_constant> push_constants: Properties;
 
 @vertex
 fn vs_main(
@@ -63,7 +63,7 @@ fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
 
 fn map_scene(p: vec3<f32>) -> SceneObject {
     let displacement = sin(5.0 * p.x) * sin(5.0 * p.y) * sin(5.0 * p.z) * 0.25;
-    let time = window_dimensions.time;
+    let time = push_constants.time;
 
     let sphere1_pos = vec3<f32>(
         sin(time) * 1.0,
@@ -201,17 +201,17 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let aspect_ratio = window_dimensions.size.x / window_dimensions.size.y;
-    let uv = in.clip_position.xy / window_dimensions.size;
+    let aspect_ratio = push_constants.size.x / push_constants.size.y;
+    let uv = in.clip_position.xy / push_constants.size;
     let adjusted_uv = vec2<f32>(
         (uv.x - 0.7),
         (uv.y - 0.5) * aspect_ratio
     );
 
-    let cos_yaw = cos(window_dimensions.camera_yaw);
-    let sin_yaw = sin(window_dimensions.camera_yaw);
-    let cos_pitch = cos(window_dimensions.camera_pitch);
-    let sin_pitch = sin(window_dimensions.camera_pitch);
+    let cos_yaw = cos(push_constants.camera_yaw);
+    let sin_yaw = sin(push_constants.camera_yaw);
+    let cos_pitch = cos(push_constants.camera_pitch);
+    let sin_pitch = sin(push_constants.camera_pitch);
 
     let rotation_y = mat3x3<f32>(
         cos_yaw, 0.0, -sin_yaw,
