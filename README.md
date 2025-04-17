@@ -1,6 +1,6 @@
 # WGPU Raymarcher
 
-A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in **Rust** and **WGSL**. This project is a work in progress, exploring raymarching techniques and leveraging the power of modern GPU rendering. FPS capping can be toggled by pressing `F`.
+A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in **Rust** and **WGSL**. This project is a work in progress, exploring the raymarching technique. FPS capping can be toggled by pressing `F`.
 
 ![Image](screenshots/screenshot.png)
 
