@@ -70,14 +70,14 @@ fn map_scene(p: vec3<f32>) -> SceneObject {
         cos(time) * 1.0,
         2.0
     );
-    let sphere1 = sphere_sdf(p - sphere1_pos, 0.5) + displacement;
+    let sphere1 = sphere_sdf(p - sphere1_pos, 0.5);
 
     let sphere2_pos = vec3<f32>(
         cos(time * 0.5) * 1.5,
         sin(time * 0.7) * 0.8,
         2.0 + sin(time) * 0.5
     );
-    let sphere2 = sphere_sdf(p - sphere2_pos, 0.7) + displacement;
+    let sphere2 = sphere_sdf(p - sphere2_pos, 0.7);
 
     let ground = -p.y + 1.5;
 
@@ -131,7 +131,7 @@ fn get_material_color(material_id: i32, p: vec3<f32>) -> vec3<f32> {
         }
 
         default: {
-            return vec3<f32>(1.0, 1.0, 1.0); // White default
+            return vec3<f32>(1.0, 0.0, 1.0); // Purple place default
         }
     }
 }
@@ -154,9 +154,9 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
 
 fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var t: f32 = 0.0;
-    const MAX_STEPS: i32 = 512; // higher value will eliminate no-hit artifacts
+    const MAX_STEPS: i32 = 128; // higher value will eliminate no-hit artifacts
     const MAX_DIST: f32 = 100.0;
-    const EPSILON: f32 = 0.001;
+    const HIT_DIST: f32 = 0.01;
     const AMBIENT: f32 = 0.075;
 
     for(var i: i32 = 0; i < MAX_STEPS; i++) {
@@ -164,7 +164,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
         let scene_info = map_scene(p);
         let d = scene_info.dist;
 
-        if(d < EPSILON) {
+        if(d < HIT_DIST) {
             // Hit something - calculate shading
             let normal = get_normal(p);
 
