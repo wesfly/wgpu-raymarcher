@@ -70,39 +70,39 @@ fn map_scene(p: vec3<f32>) -> SceneObject {
         cos(time) * 1.0,
         2.0
     );
-    let sphere1_dist = sphere_sdf(p - sphere1_pos, 0.5) + displacement;
+    let sphere1 = sphere_sdf(p - sphere1_pos, 0.5) + displacement;
 
     let sphere2_pos = vec3<f32>(
         cos(time * 0.5) * 1.5,
         sin(time * 0.7) * 0.8,
         2.0 + sin(time) * 0.5
     );
-    let sphere2_dist = sphere_sdf(p - sphere2_pos, 0.7) + displacement;
+    let sphere2 = sphere_sdf(p - sphere2_pos, 0.7) + displacement;
 
-    let ground_dist = -p.y + 1.5;
+    let ground = -p.y + 1.5;
 
-    let box_dist = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
+    let box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
 
     // Find the closest object in one step
     var result: SceneObject;
 
     // Initialize with first object (sphere1)
-    result.dist = sphere1_dist;
+    result.dist = sphere1;
     result.material_id = 1;
 
     // Check each object and update if it's closer
-    if (sphere2_dist < result.dist) {
-        result.dist = sphere2_dist;
+    if (sphere2 < result.dist) {
+        result.dist = sphere2;
         result.material_id = 2;
     }
 
-    if (ground_dist < result.dist) {
-        result.dist = ground_dist;
+    if (ground < result.dist) {
+        result.dist = ground;
         result.material_id = 3;
     }
 
-    if (box_dist < result.dist) {
-        result.dist = box_dist;
+    if (box < result.dist) {
+        result.dist = box;
         result.material_id = 4;
     }
 
