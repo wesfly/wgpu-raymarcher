@@ -2,6 +2,8 @@
 
 A **raymarcher** built with [wgpu](https://github.com/gfx-rs/wgpu), written in **Rust** and **WGSL**. This project is a work in progress, exploring the raymarching technique. FPS capping can be toggled by pressing `F`.
 
+This repo was moved from GitHub to Codeberg.
+
 ![Image](screenshots/screenshot.png)
 
 ## Features
