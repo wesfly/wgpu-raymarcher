@@ -10,7 +10,7 @@ use winit::{
     event::*,
     event_loop::EventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::{Window, WindowBuilder},
+    window::Window,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -60,22 +60,20 @@ impl<'a> State<'a> {
             .unwrap();
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::PUSH_CONSTANTS,
-                    required_limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits {
-                            max_push_constant_size: 256,
-                            ..Default::default()
-                        }
-                    },
-                    memory_hints: Default::default(),
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::PUSH_CONSTANTS,
+                required_limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits {
+                        max_push_constant_size: 256,
+                        ..Default::default()
+                    }
                 },
-                None,
-            )
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .unwrap();
 
@@ -372,7 +370,7 @@ pub async fn run() {
 
     let event_loop = EventLoop::new().unwrap();
     let title = env!("CARGO_PKG_NAME");
-    let window = WindowBuilder::new()
+    let window = winit::window::WindowBuilder::new()
         .with_title(title)
         .build(&event_loop)
         .unwrap();
