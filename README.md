@@ -10,6 +10,9 @@ This repo is available on both [GitHub](https://github.com/wesfly/wgpu-raymarche
 
 - Light and Shadow
 - Camera controls
+- Animated movement
+- Smooth blending between objects
+- FPS capping
 
 ## Installation
 
