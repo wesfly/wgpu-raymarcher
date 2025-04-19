@@ -35,9 +35,91 @@ fn vs_main(
     return out;
 }
 
-struct ObjectInfo {
+struct SdfInfo {
     dist: f32,
-    id: i32,
+    material_id: i32,
+};
+
+fn smin(a: SdfInfo, b: SdfInfo, k: f32) -> SdfInfo {
+    let h = max(k - abs(a.dist - b.dist), 0.0) / k;
+    let m = 0.5 + 0.5 * (b.dist - a.dist) / max(abs(b.dist - a.dist), 0.0001);
+    let d = min(a.dist, b.dist) - h * h * h * k * (1.0 / 6.0);
+
+    // Smoothly blend between the materials based on the amount of blending
+    let blend_amount = h * h * h;
+    let mat_id = select(
+        select(b.material_id, a.material_id, a.dist < b.dist),
+        -1,  // Special blend material ID
+        blend_amount > 0.1
+    );
+
+    return SdfInfo(d, mat_id);
+}
+
+// Simplified material blending function
+fn blend_material_colours(a: vec3<f32>, b: vec3<f32>, blend: f32) -> vec3<f32> {
+    return mix(a, b, blend);
+}
+
+fn sphere_sdf(p: vec3<f32>, center: vec3<f32>, radius: f32, mat_id: i32) -> SdfInfo {
+    return SdfInfo(length(p - center) - radius, mat_id);
+}
+
+fn box_sdf(p: vec3<f32>, center: vec3<f32>, b: vec3<f32>, mat_id: i32) -> SdfInfo {
+    let q = abs(p - center) - b;
+    return SdfInfo(
+        length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0),
+        mat_id
+    );
+}
+
+fn plane_sdf(p: vec3<f32>, n: vec3<f32>, h: f32, mat_id: i32) -> SdfInfo {
+    return SdfInfo(dot(-p, n) + h, mat_id);
+}
+
+// Material IDs
+const MAT_RED_SPHERE = 0;
+const MAT_BLUE_SPHERE = 1;
+const MAT_YELLOW_BOX = 2;
+const MAT_GROUND = 3;
+
+fn map_scene(p: vec3<f32>) -> SdfInfo {
+    let time = push_constants.time;
+
+    // Sphere 1 - Red
+    let sphere1_pos = vec3<f32>(
+        sin(time) * 1.0,
+        cos(time) * 1.0,
+        2.0
+    );
+    let sphere1 = sphere_sdf(p, sphere1_pos, 0.5, MAT_RED_SPHERE);
+
+    // Sphere 2 - Blue
+    let sphere2_pos = vec3<f32>(
+        cos(time * 0.5) * 1.5,
+        sin(time * 0.7) * 0.8,
+        2.0 + sin(time) * 0.5
+    );
+    let sphere2 = sphere_sdf(p, sphere2_pos, 0.7, MAT_BLUE_SPHERE);
+
+    // Smooth blend between spheres
+    let blended_spheres = smin(sphere1, sphere2, 0.8);
+
+    let box = box_sdf(p, vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0), MAT_YELLOW_BOX);
+
+    let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
+
+    var result = blended_spheres;
+
+    if (box.dist < result.dist) {
+        result = box;
+    }
+
+    if (ground.dist < result.dist) {
+        result = ground;
+    }
+
+    return result;
 }
 
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
@@ -45,110 +127,49 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
     let e = vec2<f32>(EPSILON, 0.0);
 
     return normalize(vec3<f32>(
-        map_scene(p + e.xyy) - map_scene(p - e.xyy),
-        map_scene(p + e.yxy) - map_scene(p - e.yxy),
-        map_scene(p + e.yyx) - map_scene(p - e.yyx)
+        map_scene(p + e.xyy).dist - map_scene(p - e.xyy).dist,
+        map_scene(p + e.yxy).dist - map_scene(p - e.yxy).dist,
+        map_scene(p + e.yyx).dist - map_scene(p - e.yyx).dist
     ));
 }
 
-fn sphere_sdf(p: vec3<f32>, radius: f32) -> f32 {
-    return length(p) - radius;
-}
+fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
+    var colour: vec3<f32>;
 
-fn box_sdf(p: vec3<f32>, b: vec3<f32>) -> f32 {
-    let q = abs(p) - b;
-    return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
-}
-
-fn map_scene(p: vec3<f32>) -> f32 {
-    return get_scene_info(p).dist;
-}
-
-fn get_scene_info(p: vec3<f32>) -> ObjectInfo {
-    let time = push_constants.time;
-    var result = ObjectInfo(1000.0, -1);
-
-    // Sphere 1
-    let sphere1_pos = vec3<f32>(
-        sin(time) * 1.0,
-        cos(time) * 1.0,
-        2.0
-    );
-    let d_sphere1 = sphere_sdf(p - sphere1_pos, 0.5);
-    if (d_sphere1 < result.dist) {
-        result.dist = d_sphere1;
-        result.id = 0;
-    }
-
-    // Sphere 2
-    let sphere2_pos = vec3<f32>(
-        cos(time * 0.5) * 1.5,
-        sin(time * 0.7) * 0.8,
-        2.0 + sin(time) * 0.5
-    );
-    let d_sphere2 = sphere_sdf(p - sphere2_pos, 0.7);
-    if (d_sphere2 < result.dist) {
-        result.dist = d_sphere2;
-        result.id = 1;
-    }
-
-    // Box
-    let d_box = box_sdf(p - vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0));
-    if (d_box < result.dist) {
-        result.dist = d_box;
-        result.id = 2;
-    }
-
-    // Ground
-    let d_ground = -p.y + 1.5;
-    if (d_ground < result.dist) {
-        result.dist = d_ground;
-        result.id = 3;
-    }
-
-    return result;
-}
-
-fn map_scene_colour(p: vec3<f32>) -> vec3<f32> {
-    let obj_info = get_scene_info(p);
-    let time = push_constants.time;
-
-    switch(obj_info.id) {
-        // Sphere 1
-        case 0: {
-            return vec3<f32>(0.9, 0.2, 0.3);
+    switch(mat_id) {
+        case MAT_RED_SPHERE: {
+            colour = vec3<f32>(0.9, 0.2, 0.3); // Red
         }
-        // Sphere 2
-        case 1: {
-            return vec3<f32>(0.2, 0.4, 0.8);
+        case MAT_BLUE_SPHERE: {
+            colour = vec3<f32>(0.2, 0.4, 0.8); // Blue
         }
-        // Box
-        case 2: {
-            return vec3<f32>(0.8, 0.7, 0.2);
+        case MAT_YELLOW_BOX: {
+            colour = vec3<f32>(0.8, 0.7, 0.2); // Yellow
         }
-        // Ground
-        case 3: {
+        case MAT_GROUND: {
             // Checkerboard pattern for the ground
             let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
-            return mix(
+            colour = mix(
                 vec3<f32>(0.8, 0.8, 0.8),  // Light gray
                 vec3<f32>(0.2, 0.2, 0.2),  // Dark gray
                 checker
             );
         }
-        // Default (shouldn't happen)
+
         default: {
-            return vec3<f32>(1.0, 0.0, 1.0);
+            colour = vec3<f32>(1.0, 0.0, 1.0);
         }
     }
+
+    return colour;
 }
 
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f32 {
     var res = 1.0;
     var t = mint;
 
-    for(var i: i32 = 0; i < 64 && t < maxt; i++) {
-        let h = map_scene(ro + rd * t);
+    for(var i: i32 = 0; i < 32 && t < maxt; i++) {
+        let h = map_scene(ro + rd * t).dist;
         if(h < 0.001) {
             return 0.0;
         }
@@ -164,34 +185,32 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     const MAX_STEPS: i32 = 512; // higher value will eliminate no-hit artifacts
     const MAX_DIST: f32 = 100.0;
     const HIT_DIST: f32 = 0.01;
-    const AMBIENT: f32 = 0.075;
+    const AMBIENT: f32 = 0.1;
 
     for(var i: i32 = 0; i < MAX_STEPS; i++) {
         let p = ray_origin + t * ray_direction;
-        let d = map_scene(p);
+        let scene_info = map_scene(p);
+        let d = scene_info.dist;
 
         if(d < HIT_DIST) {
             // Hit something - calculate shading
             let normal = get_normal(p);
+
+            // Get material colour
+            let material_colour = get_material_colour(scene_info.material_id, p);
 
             // Light properties
             let light_pos = vec3<f32>(2.0, -4.0, -3.0);
             let light_dir = normalize(light_pos - p);
             let light_dist = length(light_pos - p);
 
-            // Diffuse
+            // Diffuse lighting
             let diff = max(dot(normal, light_dir), 0.0);
 
             // Shadows
             let shadow = soft_shadow(p, light_dir, 0.2, light_dist, 16.0);
 
-            // Material color
-            let material_color = map_scene_colour(p);
-
-            // Final color calculation
-            let final_color = material_color * (AMBIENT + diff * shadow);
-
-            return final_color;
+            return material_colour * (AMBIENT + diff * shadow);
         }
 
         if(t > MAX_DIST) {
@@ -201,7 +220,6 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
         t += d;
     }
 
-    // Return background color if no hit
     return vec3<f32>(0.0, 0.0, 0.0);
 }
 
@@ -232,10 +250,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     );
 
     let camera_pos = vec3<f32>(0.0, 0.0, -3.0);
-
     let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
+    let colour = raymarch(camera_pos, ray_direction);
 
-    let color = raymarch(camera_pos, ray_direction);
+    // Simple tone mapping
+    let tone_mapped = colour / (colour + 1.0);
 
-    return vec4<f32>(color, 1.0);
+    return vec4<f32>(tone_mapped, 1.0);
 }
