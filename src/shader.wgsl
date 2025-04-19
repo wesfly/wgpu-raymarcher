@@ -3,7 +3,7 @@ struct VertexOutput {
 };
 
 struct Properties {
-    size: vec2<f32>,
+    size: vec2<f32>,    // Window size
     time: f32,          // Time elapsed
     camera_yaw: f32,
     camera_pitch: f32,
@@ -45,7 +45,7 @@ fn smin(a: SdfInfo, b: SdfInfo, k: f32) -> SdfInfo {
     let m = 0.5 + 0.5 * (b.dist - a.dist) / max(abs(b.dist - a.dist), 0.0001);
     let d = min(a.dist, b.dist) - h * h * h * k * (1.0 / 6.0);
 
-    // Make sure that the blended area has a material id
+    // Make sure that the both spheres area has a material id
     let blend_amount = h * h * h;
     let mat_id = select(
         select(b.material_id, a.material_id, a.dist < b.dist),
@@ -81,7 +81,6 @@ const MAT_GROUND = 3;
 fn map_scene(p: vec3<f32>) -> SdfInfo {
     let time = push_constants.time;
 
-    // Sphere 1 - Red
     let sphere1_pos = vec3<f32>(
         sin(time) * 1.0,
         cos(time) * 1.0,
@@ -89,7 +88,6 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
     );
     let sphere1 = sphere_sdf(p, sphere1_pos, 0.5, MAT_RED_SPHERE);
 
-    // Sphere 2 - Blue
     let sphere2_pos = vec3<f32>(
         cos(time * 0.5) * 1.5,
         sin(time * 0.7) * 0.8,
@@ -104,6 +102,7 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
 
     let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
 
+    // Init if statements
     var result = blended_spheres;
 
     if (box.dist < result.dist) {
