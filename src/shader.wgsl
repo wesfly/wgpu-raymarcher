@@ -138,13 +138,13 @@ fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
 
     switch(mat_id) {
         case MAT_RED_SPHERE: {
-            colour = vec3<f32>(0.9, 0.2, 0.3); // Red
+            colour = vec3<f32>(0.9, 0.1, 0.1);
         }
         case MAT_BLUE_SPHERE: {
-            colour = vec3<f32>(0.2, 0.4, 0.8); // Blue
+            colour = vec3<f32>(0.1, 0.2, 0.8);
         }
         case MAT_YELLOW_BOX: {
-            colour = vec3<f32>(0.8, 0.7, 0.2); // Yellow
+            colour = vec3<f32>(0.2, 0.8, 0.2);
         }
         case MAT_GROUND: {
             // Checkerboard pattern for the ground
@@ -157,7 +157,7 @@ fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
         }
 
         default: {
-            colour = vec3<f32>(1.0, 0.0, 1.0);
+            colour = vec3<f32>(1.0, 1.0, 0.0);
         }
     }
 
