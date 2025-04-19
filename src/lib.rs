@@ -1,5 +1,4 @@
-// Great thanks to https://github.com/sotrh/learn-wgpu
-// This code is modified
+// Many thanks to https://github.com/sotrh/learn-wgpu for their learning resources
 
 use std::{
     iter,
@@ -13,10 +12,13 @@ use winit::{
     window::Window,
 };
 
+mod input;
+use input::handle_input;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-struct State<'a> {
+pub struct State<'a> {
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -25,14 +27,14 @@ struct State<'a> {
     render_pipeline: wgpu::RenderPipeline,
     window: &'a Window,
     start_time: std::time::Instant,
-    mouse_pressed: bool,
-    mouse_position: (f32, f32),
-    camera_rotation: (f32, f32), // (yaw, pitch)
+    pub mouse_pressed: bool,
+    pub mouse_position: (f32, f32),
+    pub camera_rotation: (f32, f32), // (yaw, pitch)
     frame_count: u32,
     last_fps_update: std::time::Instant,
     fps: f64,
-    fps_cap_enabled: bool,
-    target_fps: u32,
+    pub fps_cap_enabled: bool,
+    pub target_fps: u32,
     last_frame_time: Instant,
 }
 
@@ -67,6 +69,7 @@ impl<'a> State<'a> {
                     wgpu::Limits::downlevel_webgl2_defaults()
                 } else {
                     wgpu::Limits {
+                        // Push constants should not exceed that limit
                         max_push_constant_size: 256,
                         ..Default::default()
                     }
@@ -190,75 +193,12 @@ impl<'a> State<'a> {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } => {
-                self.mouse_pressed = *state == ElementState::Pressed;
-                true
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                if self.mouse_pressed {
-                    let new_pos = (position.x as f32, position.y as f32);
-                    let delta = (
-                        new_pos.0 - self.mouse_position.0,
-                        new_pos.1 - self.mouse_position.1,
-                    );
-
-                    // Update camera rotation
-                    self.camera_rotation.0 += delta.0 * 0.01;
-                    self.camera_rotation.1 += delta.1 * -0.01;
-
-                    // Clamp pitch to prevent camera flipping
-                    self.camera_rotation.1 = self
-                        .camera_rotation
-                        .1
-                        .max(-std::f32::consts::PI / 2.0 + 0.1)
-                        .min(std::f32::consts::PI / 2.0 - 0.1);
-                }
-                self.mouse_position = (position.x as f32, position.y as f32);
-                true
-            }
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        physical_key: PhysicalKey::Code(key),
-                        ..
-                    },
-                ..
-            } => {
-                match key {
-                    // Toggle FPS cap with the F key
-                    KeyCode::KeyF => {
-                        self.fps_cap_enabled = !self.fps_cap_enabled;
-                        log::info!(
-                            "FPS cap {} (target: {} FPS)",
-                            if self.fps_cap_enabled {
-                                "enabled"
-                            } else {
-                                "disabled"
-                            },
-                            self.target_fps
-                        );
-
-                        // Update the window title to show the cap status
-                        self.update_window_title();
-
-                        true
-                    }
-                    _ => false,
-                }
-            }
-            _ => false,
-        }
+        handle_input(self, event)
     }
 
     fn update(&mut self) {}
 
-    fn update_window_title(&self) {
+    pub fn update_window_title(&self) {
         let cap_status = if self.fps_cap_enabled {
             format!("(capped at {} FPS)", self.target_fps)
         } else {
@@ -323,6 +263,8 @@ impl<'a> State<'a> {
             let elapsed = self.start_time.elapsed().as_secs_f32();
 
             render_pass.set_pipeline(&self.render_pipeline);
+
+            // Here's where the CPU communicates with the GPU
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 0,
