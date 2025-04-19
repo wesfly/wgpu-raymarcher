@@ -45,7 +45,7 @@ fn smin(a: SdfInfo, b: SdfInfo, k: f32) -> SdfInfo {
     let m = 0.5 + 0.5 * (b.dist - a.dist) / max(abs(b.dist - a.dist), 0.0001);
     let d = min(a.dist, b.dist) - h * h * h * k * (1.0 / 6.0);
 
-    // Make sure that the both spheres area has a material id
+    // Make sure that both spheres have a material id
     let blend_amount = h * h * h;
     let mat_id = select(
         select(b.material_id, a.material_id, a.dist < b.dist),
