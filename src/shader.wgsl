@@ -45,20 +45,15 @@ fn smin(a: SdfInfo, b: SdfInfo, k: f32) -> SdfInfo {
     let m = 0.5 + 0.5 * (b.dist - a.dist) / max(abs(b.dist - a.dist), 0.0001);
     let d = min(a.dist, b.dist) - h * h * h * k * (1.0 / 6.0);
 
-    // Smoothly blend between the materials based on the amount of blending
+    // Make sure that the blended area has a material id
     let blend_amount = h * h * h;
     let mat_id = select(
         select(b.material_id, a.material_id, a.dist < b.dist),
-        -1,  // Special blend material ID
+        -1,
         blend_amount > 0.1
     );
 
     return SdfInfo(d, mat_id);
-}
-
-// Simplified material blending function
-fn blend_material_colours(a: vec3<f32>, b: vec3<f32>, blend: f32) -> vec3<f32> {
-    return mix(a, b, blend);
 }
 
 fn sphere_sdf(p: vec3<f32>, center: vec3<f32>, radius: f32, mat_id: i32) -> SdfInfo {
@@ -150,8 +145,8 @@ fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
             // Checkerboard pattern for the ground
             let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
             colour = mix(
-                vec3<f32>(0.8, 0.8, 0.8),  // Light gray
-                vec3<f32>(0.2, 0.2, 0.2),  // Dark gray
+                vec3<f32>(0.8, 0.8, 0.8),
+                vec3<f32>(0.2, 0.2, 0.2),
                 checker
             );
         }
@@ -182,7 +177,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
 
 fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var t: f32 = 0.0;
-    const MAX_STEPS: i32 = 512; // higher value will eliminate no-hit artifacts
+    const MAX_STEPS: i32 = 512;
     const MAX_DIST: f32 = 100.0;
     const HIT_DIST: f32 = 0.01;
     const AMBIENT: f32 = 0.1;
