@@ -76,7 +76,7 @@ fn plane_sdf(p: vec3<f32>, n: vec3<f32>, h: f32, mat_id: i32) -> SdfInfo {
 // Material IDs
 const MAT_RED_SPHERE = 0;
 const MAT_BLUE_SPHERE = 1;
-const MAT_YELLOW_BOX = 2;
+const MAT_GREEN_BOX = 2;
 const MAT_GROUND = 3;
 
 fn map_scene(p: vec3<f32>) -> SdfInfo {
@@ -99,7 +99,7 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
     // Smooth blend between spheres
     let blended_spheres = smin(sphere1, sphere2, 0.8);
 
-    let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.cube_position / 1.0), vec3<f32>(1.0), MAT_YELLOW_BOX);
+    let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.cube_position), vec3<f32>(1.0), MAT_GREEN_BOX);
 
     let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
 
@@ -138,7 +138,7 @@ fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
         case MAT_BLUE_SPHERE: {
             colour = vec3<f32>(0.1, 0.2, 0.8);
         }
-        case MAT_YELLOW_BOX: {
+        case MAT_GREEN_BOX: {
             colour = vec3<f32>(0.2, 0.8, 0.2);
         }
         case MAT_GROUND: {
