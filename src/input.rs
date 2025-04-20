@@ -66,11 +66,11 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                     true
                 }
                 KeyCode::KeyW => {
-                    state.cube_position = state.cube_position + 0.05;
+                    state.cube_position.2 += 0.5;
                     true
                 }
                 KeyCode::KeyS => {
-                    state.cube_position = state.cube_position - 0.05;
+                    state.cube_position.2 -= 0.5;
                     true
                 }
                 _ => false,
