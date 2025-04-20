@@ -7,6 +7,7 @@ struct Properties {
     time: f32,          // Time elapsed
     camera_yaw: f32,
     camera_pitch: f32,
+    cube_position: f32,
 }
 
 var<push_constant> push_constants: Properties;
@@ -98,7 +99,7 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
     // Smooth blend between spheres
     let blended_spheres = smin(sphere1, sphere2, 0.8);
 
-    let box = box_sdf(p, vec3<f32>(3.2, 0.0, -0.5), vec3<f32>(1.0), MAT_YELLOW_BOX);
+    let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.cube_position / 1.0), vec3<f32>(1.0), MAT_YELLOW_BOX);
 
     let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
 

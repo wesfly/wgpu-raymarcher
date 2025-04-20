@@ -36,6 +36,7 @@ pub struct State<'a> {
     pub fps_cap_enabled: bool,
     pub target_fps: u32,
     last_frame_time: Instant,
+    pub cube_position: f32,
 }
 
 impl<'a> State<'a> {
@@ -111,7 +112,7 @@ impl<'a> State<'a> {
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<[f32; 5]>() as u32,
+                    range: 0..std::mem::size_of::<[f32; 6]>() as u32,
                 }],
             });
 
@@ -176,6 +177,7 @@ impl<'a> State<'a> {
             fps_cap_enabled: true,
             target_fps: 60,
             last_frame_time: Instant::now(),
+            cube_position: 0.0,
         }
     }
 
@@ -274,6 +276,7 @@ impl<'a> State<'a> {
                     elapsed,
                     self.camera_rotation.0,
                     self.camera_rotation.1,
+                    self.cube_position,
                 ]),
             );
             render_pass.draw(0..6, 0..1);
