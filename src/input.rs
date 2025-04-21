@@ -40,14 +40,15 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
         WindowEvent::KeyboardInput {
             event:
                 KeyEvent {
-                    state: ElementState::Pressed,
+                    state: key_state,
                     physical_key: PhysicalKey::Code(key),
                     ..
                 },
             ..
         } => {
-            match key {
-                KeyCode::KeyF => {
+            match (key, key_state) {
+                // Key press events
+                (KeyCode::KeyF, ElementState::Pressed) => {
                     state.fps_cap_enabled = !state.fps_cap_enabled;
                     log::info!(
                         "FPS cap {} (target: {} FPS)",
@@ -59,17 +60,24 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                         state.target_fps
                     );
 
-                    // Update the window title to show the cap status
                     state.update_window_title();
+                    true
+                }
+                (KeyCode::KeyW, ElementState::Pressed) => {
+                    state.y_input_axis = 1;
+                    true
+                }
+                (KeyCode::KeyS, ElementState::Pressed) => {
+                    state.y_input_axis = -1;
+                    true
+                }
 
+                (KeyCode::KeyW, ElementState::Released) => {
+                    state.y_input_axis = 0;
                     true
                 }
-                KeyCode::KeyW => {
-                    state.cube_position.2 += 0.5;
-                    true
-                }
-                KeyCode::KeyS => {
-                    state.cube_position.2 -= 0.5;
+                (KeyCode::KeyS, ElementState::Released) => {
+                    state.y_input_axis = 0;
                     true
                 }
                 _ => false,

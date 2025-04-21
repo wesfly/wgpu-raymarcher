@@ -38,7 +38,7 @@ pub struct State {
     pub fps_cap_enabled: bool,
     pub target_fps: u32,
     last_frame_time: Instant,
-    pub cube_position: (f32, f32, f32),
+    pub y_input_axis: i8,
 }
 
 impl State {
@@ -181,7 +181,7 @@ impl State {
             fps_cap_enabled: true,
             target_fps: 60,
             last_frame_time: Instant::now(),
-            cube_position: (3.2, 0.0, 0.0),
+            y_input_axis: 0,
         }
     }
 
@@ -253,7 +253,7 @@ impl State {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
+                            r: 1.0,
                             g: 0.0,
                             b: 0.0,
                             a: 1.0,
@@ -280,7 +280,7 @@ impl State {
                     elapsed,
                     self.camera_rotation.0,
                     self.camera_rotation.1,
-                    self.cube_position.2 as f32,
+                    self.y_input_axis as f32,
                 ]),
             );
             render_pass.draw(0..6, 0..1);
