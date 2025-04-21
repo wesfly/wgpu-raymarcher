@@ -23,13 +23,7 @@ This repo is available on both [GitHub](https://github.com/wesfly/wgpu-raymarche
    cd wgpu-raymarcher
    ```
 
-2. Build the project (optional):
-
-   ```bash
-   cargo build
-   ```
-
-3. Run the application:
+2. Run the application:
 
    ```bash
    cargo run
