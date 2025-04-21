@@ -2,14 +2,17 @@
 
 use std::{
     iter,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use winit::{
+    application::ApplicationHandler,
+    // dpi::PhysicalSize,
     event::*,
-    event_loop::EventLoop,
+    event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::Window,
+    window::{Window, WindowAttributes},
 };
 
 mod input;
@@ -18,14 +21,14 @@ use input::handle_input;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-pub struct State<'a> {
-    surface: wgpu::Surface<'a>,
+pub struct State {
+    surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    window: &'a Window,
+    window: Arc<Window>,
     start_time: std::time::Instant,
     pub mouse_pressed: bool,
     pub mouse_position: (f32, f32),
@@ -39,9 +42,10 @@ pub struct State<'a> {
     pub cube_position: (f32, f32, f32),
 }
 
-impl<'a> State<'a> {
-    async fn new(window: &'a Window) -> State<'a> {
+impl State {
+    async fn new(window: Window) -> Self {
         let size = window.inner_size();
+        let window = Arc::new(window);
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
@@ -51,7 +55,7 @@ impl<'a> State<'a> {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -63,21 +67,23 @@ impl<'a> State<'a> {
             .unwrap();
 
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::PUSH_CONSTANTS,
-                required_limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits {
-                        // Push constants should not exceed that limit
-                        max_push_constant_size: 256,
-                        ..Default::default()
-                    }
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    required_features: wgpu::Features::PUSH_CONSTANTS,
+                    required_limits: if cfg!(target_arch = "wasm32") {
+                        wgpu::Limits::downlevel_webgl2_defaults()
+                    } else {
+                        wgpu::Limits {
+                            // Push constants should not exceed that limit
+                            max_push_constant_size: 256,
+                            ..Default::default()
+                        }
+                    },
+                    memory_hints: Default::default(),
+                    trace: wgpu::Trace::Off,
                 },
-                memory_hints: Default::default(),
-                trace: wgpu::Trace::Off,
-            })
+            )
             .await
             .unwrap();
 
@@ -93,8 +99,8 @@ impl<'a> State<'a> {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            width: size.width,
-            height: size.height,
+            width: size.width.max(1),
+            height: size.height.max(1),
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
@@ -182,7 +188,7 @@ impl<'a> State<'a> {
     }
 
     pub fn window(&self) -> &Window {
-        &self.window
+        self.window.as_ref()
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -302,6 +308,92 @@ impl<'a> State<'a> {
     }
 }
 
+struct App {
+    state: Option<State>,
+}
+
+impl App {
+    fn new() -> Self {
+        Self { state: None }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window_attributes = WindowAttributes::default()
+            .with_title(env!("CARGO_PKG_NAME"));
+
+        let window = event_loop
+            .create_window(window_attributes)
+            .unwrap();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowExtWebSys;
+            let _ = window.request_inner_size(PhysicalSize::new(650, 400));
+
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("wasm-example")?;
+                    let canvas = web_sys::Element::from(window.canvas()?);
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("Couldn't append canvas to document body.");
+        }
+
+        self.state = Some(pollster::block_on(State::new(window)));
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        if let Some(state) = self.state.as_mut() {
+            if state.input(&event) {
+                return;
+            }
+
+            match event {
+                WindowEvent::CloseRequested
+                | WindowEvent::KeyboardInput {
+                    event:
+                        KeyEvent {
+                            state: ElementState::Pressed,
+                            physical_key: PhysicalKey::Code(KeyCode::Escape),
+                            ..
+                        },
+                    ..
+                } => event_loop.exit(),
+                WindowEvent::RedrawRequested => {
+                    state.window().request_redraw();
+                    state.update();
+                    match state.render() {
+                        Ok(_) => {}
+                        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                            state.resize(state.size)
+                        }
+                        Err(wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other) => {
+                            log::error!("Critical surface error: {:?}", wgpu::SurfaceError::OutOfMemory);
+                            event_loop.exit();
+                        }
+                        Err(wgpu::SurfaceError::Timeout) => {
+                            log::warn!("Surface timeout")
+                        }
+                    }
+                }
+                WindowEvent::Resized(physical_size) => {
+                    state.resize(physical_size);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
     cfg_if::cfg_if! {
@@ -314,83 +406,14 @@ pub async fn run() {
     }
 
     let event_loop = EventLoop::new().unwrap();
-    let title = env!("CARGO_PKG_NAME");
-    let window = winit::window::WindowBuilder::new()
-        .with_title(title)
-        .build(&event_loop)
-        .unwrap();
+    let mut app = App::new();
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(target_arch="wasm32"))]
+    event_loop.run_app(&mut app).unwrap();
+
+    #[cfg(target_arch="wasm32")]
     {
-        use winit::dpi::PhysicalSize;
-        let _ = window.request_inner_size(PhysicalSize::new(650, 400));
-
-        use winit::platform::web::WindowExtWebSys;
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| {
-                let dst = doc.get_element_by_id("wasm-example")?;
-                let canvas = web_sys::Element::from(window.canvas()?);
-                dst.append_child(&canvas).ok()?;
-                Some(())
-            })
-            .expect("Couldn't append canvas to document body.");
+        use winit::platform::web::EventLoopExtWebSys;
+        event_loop.spawn_app(app);
     }
-
-    let mut state = State::new(&window).await;
-    let mut surface_configured = false;
-
-    event_loop
-        .run(move |event, control_flow| match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == state.window().id() => {
-                if !state.input(event) {
-                    match event {
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            event:
-                                KeyEvent {
-                                    state: ElementState::Pressed,
-                                    physical_key: PhysicalKey::Code(KeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        } => control_flow.exit(),
-                        WindowEvent::Resized(physical_size) => {
-                            surface_configured = true;
-                            state.resize(*physical_size);
-                        }
-                        WindowEvent::RedrawRequested => {
-                            state.window().request_redraw();
-
-                            if !surface_configured {
-                                return;
-                            }
-
-                            state.update();
-                            match state.render() {
-                                Ok(_) => {}
-                                Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                                    state.resize(state.size)
-                                }
-                                Err(
-                                    wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other,
-                                ) => {
-                                    log::error!("OutOfMemory");
-                                    control_flow.exit();
-                                }
-                                Err(wgpu::SurfaceError::Timeout) => {
-                                    log::warn!("Surface timeout")
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        })
-        .unwrap();
 }
