@@ -47,7 +47,6 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
             ..
         } => {
             match key {
-                // Toggle FPS cap with the F key
                 KeyCode::KeyF => {
                     state.fps_cap_enabled = !state.fps_cap_enabled;
                     log::info!(

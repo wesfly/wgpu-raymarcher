@@ -8,7 +8,6 @@ use std::{
 
 use winit::{
     application::ApplicationHandler,
-    // dpi::PhysicalSize,
     event::*,
     event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
@@ -75,7 +74,6 @@ impl State {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
                         wgpu::Limits {
-                            // Push constants should not exceed that limit
                             max_push_constant_size: 256,
                             ..Default::default()
                         }
