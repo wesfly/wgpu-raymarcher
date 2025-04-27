@@ -73,11 +73,17 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                 }
 
                 (KeyCode::KeyW, ElementState::Released) => {
-                    state.y_input_axis = 0;
+                    // Only reset if this key was responsible for the current input value
+                    if state.y_input_axis == 1 {
+                        state.y_input_axis = 0;
+                    }
                     true
                 }
                 (KeyCode::KeyS, ElementState::Released) => {
-                    state.y_input_axis = 0;
+                    // Only reset if this key was responsible for the current input value
+                    if state.y_input_axis == -1 {
+                        state.y_input_axis = 0;
+                    }
                     true
                 }
                 _ => false,

@@ -39,6 +39,8 @@ pub struct State {
     pub target_fps: u32,
     last_frame_time: Instant,
     pub y_input_axis: i8,
+    pub box_z_position: f32,
+    last_update_time: Instant,
 }
 
 impl State {
@@ -116,7 +118,7 @@ impl State {
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<[f32; 6]>() as u32,
+                    range: 0..std::mem::size_of::<[f32; 7]>() as u32, // Updated for extra field
                 }],
             });
 
@@ -163,6 +165,7 @@ impl State {
 
         surface.configure(&device, &config);
 
+        let now = Instant::now();
         Self {
             surface,
             device,
@@ -171,17 +174,19 @@ impl State {
             config,
             render_pipeline,
             window,
-            start_time: std::time::Instant::now(),
+            start_time: now,
             mouse_pressed: false,
             mouse_position: (0.0, 0.0),
             camera_rotation: (0.0, 0.0),
             frame_count: 0,
-            last_fps_update: std::time::Instant::now(),
+            last_fps_update: now,
             fps: 0.0,
             fps_cap_enabled: true,
             target_fps: 60,
-            last_frame_time: Instant::now(),
+            last_frame_time: now,
             y_input_axis: 0,
+            box_z_position: 2.0,
+            last_update_time: now,
         }
     }
 
@@ -202,7 +207,16 @@ impl State {
         handle_input(self, event)
     }
 
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        let now = Instant::now();
+        let delta_time = now.duration_since(self.last_update_time).as_secs_f32();
+        self.last_update_time = now;
+
+        let move_speed = 2.0;
+        if self.y_input_axis != 0 {
+            self.box_z_position += self.y_input_axis as f32 * move_speed * delta_time;
+        }
+    }
 
     pub fn update_window_title(&self) {
         let cap_status = if self.fps_cap_enabled {
@@ -281,6 +295,7 @@ impl State {
                     self.camera_rotation.0,
                     self.camera_rotation.1,
                     self.y_input_axis as f32,
+                    self.box_z_position,
                 ]),
             );
             render_pass.draw(0..6, 0..1);
