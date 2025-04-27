@@ -82,6 +82,50 @@ const MAT_RED_SPHERE = 0;
 const MAT_BLUE_SPHERE = 1;
 const MAT_GREEN_BOX = 2;
 const MAT_GROUND = 3;
+const MAT_MIRROR_SPHERE = 4;  // New reflective material
+
+// Material properties
+struct Material {
+    color: vec3<f32>,
+    reflectivity: f32,
+};
+
+// Returns material properties for a given material ID
+fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
+    var material: Material;
+    material.reflectivity = 0.0;  // Default: non-reflective
+
+    switch(mat_id) {
+        case MAT_RED_SPHERE: {
+            material.color = vec3<f32>(0.9, 0.1, 0.1);
+        }
+        case MAT_BLUE_SPHERE: {
+            material.color = vec3<f32>(0.1, 0.2, 0.8);
+        }
+        case MAT_GREEN_BOX: {
+            material.color = vec3<f32>(0.2, 0.8, 0.2);
+            material.reflectivity = 0.3;  // Slightly reflective
+        }
+        case MAT_GROUND: {
+            // Checkerboard pattern for the ground
+            let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
+            material.color = mix(
+                vec3<f32>(0.8, 0.8, 0.8),
+                vec3<f32>(0.2, 0.2, 0.2),
+                checker
+            );
+        }
+        case MAT_MIRROR_SPHERE: {
+            material.color = vec3<f32>(0.8, 0.8, 0.9);  // Slight blue tint
+            material.reflectivity = 0.9;  // Highly reflective
+        }
+        default: {
+            material.color = vec3<f32>(1.0, 1.0, 0.0);
+        }
+    }
+
+    return material;
+}
 
 // Main scene distance function - determines the distance to the nearest surface
 fn map_scene(p: vec3<f32>) -> SdfInfo {
@@ -112,6 +156,9 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
     // Ground plane
     let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
 
+    // Add a reflective mirror sphere
+    let mirror_sphere = sphere_sdf(p, vec3<f32>(-2.0, 0.0, 3.0), 1.2, MAT_MIRROR_SPHERE);
+
     // Find the closest primitive to the point
     var result = blended_spheres;
 
@@ -121,6 +168,10 @@ fn map_scene(p: vec3<f32>) -> SdfInfo {
 
     if (ground.dist < result.dist) {
         result = ground;
+    }
+
+    if (mirror_sphere.dist < result.dist) {
+        result = mirror_sphere;
     }
 
     return result;
@@ -136,37 +187,6 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
         map_scene(p + e.yxy).dist - map_scene(p - e.yxy).dist,
         map_scene(p + e.yyx).dist - map_scene(p - e.yyx).dist
     ));
-}
-
-fn get_material_colour(mat_id: i32, p: vec3<f32>) -> vec3<f32> {
-    var colour: vec3<f32>;
-
-    switch(mat_id) {
-        case MAT_RED_SPHERE: {
-            colour = vec3<f32>(0.9, 0.1, 0.1);
-        }
-        case MAT_BLUE_SPHERE: {
-            colour = vec3<f32>(0.1, 0.2, 0.8);
-        }
-        case MAT_GREEN_BOX: {
-            colour = vec3<f32>(0.2, 0.8, 0.2);
-        }
-        case MAT_GROUND: {
-            // Checkerboard pattern for the ground
-            let checker = (floor(p.x * 0.5) + floor(p.z * 0.5)) % 2.0;
-            colour = mix(
-                vec3<f32>(0.8, 0.8, 0.8),
-                vec3<f32>(0.2, 0.2, 0.2),
-                checker
-            );
-        }
-
-        default: {
-            colour = vec3<f32>(1.0, 1.0, 0.0);
-        }
-    }
-
-    return colour;
 }
 
 // Computes soft shadows by marching from hit point toward light
@@ -188,13 +208,20 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32) -> f3
     return res;
 }
 
-// Main ray marching function - advances ray until hitting a surface
-fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
+// Core raymarching function - returns hit information
+struct RayHit {
+    hit: bool,
+    position: vec3<f32>,
+    normal: vec3<f32>,
+    material_id: i32,
+    distance: f32,
+};
+
+fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> RayHit {
     var t: f32 = 0.0;
     const MAX_STEPS: i32 = 512;
     const MAX_DIST: f32 = 100.0;
     const HIT_DIST: f32 = 0.01;
-    const AMBIENT: f32 = 0.1;
 
     for(var i: i32 = 0; i < MAX_STEPS; i++) {
         let p = ray_origin + t * ray_direction;
@@ -203,22 +230,13 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
 
         if(d < HIT_DIST) {
             let normal = get_normal(p);
-
-            // Get material colour
-            let material_colour = get_material_colour(scene_info.material_id, p);
-
-            // Light properties
-            let light_pos = vec3<f32>(2.0, -4.0, -3.0);
-            let light_dir = normalize(light_pos - p);
-            let light_dist = length(light_pos - p);
-
-            // Diffuse lighting
-            let diff = max(dot(normal, light_dir), 0.0);
-
-            // Shadows
-            let shadow = soft_shadow(p, light_dir, 0.2, light_dist, 16.0);
-
-            return material_colour * (AMBIENT + diff * shadow);
+            return RayHit(
+                true,                // hit
+                p,                   // position
+                normal,              // normal
+                scene_info.material_id, // material_id
+                t                    // distance
+            );
         }
 
         if(t > MAX_DIST) {
@@ -229,7 +247,75 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
         t += d;
     }
 
-    return vec3<f32>(0.0, 0.0, 0.0);  // Sky/background color
+    // No hit found
+    return RayHit(
+        false,              // hit
+        vec3<f32>(0.0),     // position
+        vec3<f32>(0.0),     // normal
+        -1,                 // material_id
+        MAX_DIST            // distance
+    );
+}
+
+// Calculate lighting for a given position and material
+fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material) -> vec3<f32> {
+    const AMBIENT: f32 = 0.1;
+
+    // Light properties
+    let light_pos = vec3<f32>(2.0, -4.0, -3.0);
+    let light_dir = normalize(light_pos - position);
+    let light_dist = length(light_pos - position);
+
+    // Diffuse lighting
+    let diff = max(dot(normal, light_dir), 0.0);
+
+    // Shadows
+    let shadow = soft_shadow(position, light_dir, 0.2, light_dist, 16.0);
+
+    return material.color * (AMBIENT + diff * shadow);
+}
+
+// Main ray tracing function with reflection support
+fn trace_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>, max_bounces: i32) -> vec3<f32> {
+    var final_color = vec3<f32>(0.0);
+    var ray_contribution = 1.0;
+    var current_origin = ray_origin;
+    var current_direction = ray_direction;
+
+    // Iterate for each reflection bounce
+    for(var bounce = 0; bounce < max_bounces; bounce++) {
+        let hit = raymarch_hit(current_origin, current_direction);
+
+        if(!hit.hit) {
+            // Ray hit nothing - return background color
+            return final_color + ray_contribution * vec3<f32>(0.0, 0.0, 0.0);
+        }
+
+        // Get material properties at hit point
+        let material = get_material(hit.material_id, hit.position);
+
+        // Calculate direct lighting
+        let direct_lighting = calculate_lighting(hit.position, hit.normal, material);
+
+        // Add direct lighting contribution
+        final_color += ray_contribution * (1.0 - material.reflectivity) * direct_lighting;
+
+        // If not reflective enough or max bounces reached, stop tracing
+        if(material.reflectivity < 0.01 || bounce == max_bounces - 1) {
+            break;
+        }
+
+        // Calculate reflection direction and update for next bounce
+        current_direction = reflect(current_direction, hit.normal);
+
+        // Start the reflected ray slightly away from the surface to avoid self-intersection
+        current_origin = hit.position + hit.normal * 0.01;
+
+        // Reduce contribution of subsequent bounces
+        ray_contribution *= material.reflectivity;
+    }
+
+    return final_color;
 }
 
 @fragment
@@ -266,7 +352,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let camera_pos = vec3<f32>(0.0, 0.0, -3.0);
     // Apply camera rotations to the ray direction
     let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
-    let colour = raymarch(camera_pos, ray_direction);
+
+    // Trace ray with up to 3 reflection bounces
+    let colour = trace_ray(camera_pos, ray_direction, 3);
 
     // Reinhard tone mapping to handle high dynamic range
     let tone_mapped = colour / (colour + 1.0);
