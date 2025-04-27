@@ -13,6 +13,7 @@ Raymarching is a rendering technique that creates 3D scenes by "marching" along 
 - **Interactive Camera Control**: Rotate the camera by clicking and dragging the mouse
 - **Distance Field Primitives**: Spheres, boxes, and planes with smooth blending
 - **Dynamic Lighting & Shadows**: Soft shadows and diffuse lighting
+- **Raymarched Reflections**: Reflections with variable quality
 - **Material System**: Different materials with unique visual properties
 - **Animated Objects**: Dynamic movement of scene elements
 - **Customizable Performance**: Toggle FPS capping with the `F` key
