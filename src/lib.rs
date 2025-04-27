@@ -38,9 +38,9 @@ pub struct State {
     pub fps_cap_enabled: bool,
     pub target_fps: u32,
     last_frame_time: Instant,
-    pub y_input_axis: i8,
-    pub box_z_position: f32,
-    last_update_time: Instant,
+    pub y_input_axis: i8,          // Input value for forward/backward movement (-1, 0, 1)
+    pub box_z_position: f32,       // Z position of the 3D box in the raymarching scene
+    last_update_time: Instant,     // Timestamp for calculating delta time in physics updates
 }
 
 impl State {
@@ -48,6 +48,7 @@ impl State {
         let size = window.inner_size();
         let window = Arc::new(window);
 
+        // Create the WGPU instance with appropriate backend settings
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
@@ -58,6 +59,7 @@ impl State {
 
         let surface = instance.create_surface(Arc::clone(&window)).unwrap();
 
+        // Request an adapter suitable for the created surface
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -67,6 +69,7 @@ impl State {
             .await
             .unwrap();
 
+        // Create device and queue with push constant support enabled
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -107,21 +110,24 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
+        // Load and compile the shader from the WGSL file
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
+        // Create a pipeline layout with push constants for passing data to shader
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<[f32; 7]>() as u32, // Updated for extra field
+                    range: 0..std::mem::size_of::<[f32; 7]>() as u32, // 7 floats for our parameters
                 }],
             });
 
+        // Create the render pipeline that will draw our raymarched scene
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
@@ -194,6 +200,7 @@ impl State {
         self.window.as_ref()
     }
 
+    // Handle window resizing
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
@@ -212,6 +219,7 @@ impl State {
         let delta_time = now.duration_since(self.last_update_time).as_secs_f32();
         self.last_update_time = now;
 
+        // Move the box based on input and delta time for consistent movement speed
         let move_speed = 2.0;
         if self.y_input_axis != 0 {
             self.box_z_position += self.y_input_axis as f32 * move_speed * delta_time;
@@ -233,8 +241,9 @@ impl State {
         ));
     }
 
+    // Render a frame
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        // If FPS cap is enabled, wait until the next frame should be rendered
+        // Implement FPS cap by sleeping if we're rendering too quickly
         if self.fps_cap_enabled {
             let frame_duration = Duration::from_secs_f64(1.0 / self.target_fps as f64);
             let elapsed = self.last_frame_time.elapsed();
@@ -248,11 +257,13 @@ impl State {
             self.last_frame_time = Instant::now();
         }
 
+        // Get the current texture from the surface to render to
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
+        // Create a command encoder to issue GPU commands
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -301,6 +312,7 @@ impl State {
             render_pass.draw(0..6, 0..1);
         }
 
+        // Submit the command buffer to the GPU queue
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
 
@@ -321,6 +333,7 @@ impl State {
     }
 }
 
+// Application handler for winit event loop
 struct App {
     state: Option<State>,
 }
@@ -340,6 +353,7 @@ impl ApplicationHandler for App {
             .create_window(window_attributes)
             .unwrap();
 
+        // Special setup for WebAssembly target (not in use)
         #[cfg(target_arch = "wasm32")]
         {
             use winit::platform::web::WindowExtWebSys;
@@ -356,6 +370,7 @@ impl ApplicationHandler for App {
                 .expect("Couldn't append canvas to document body.");
         }
 
+        // Initialize our application state
         self.state = Some(pollster::block_on(State::new(window)));
     }
 
@@ -371,6 +386,7 @@ impl ApplicationHandler for App {
             }
 
             match event {
+                // Exit the application when requested
                 WindowEvent::CloseRequested
                 | WindowEvent::KeyboardInput {
                     event:
@@ -381,11 +397,14 @@ impl ApplicationHandler for App {
                         },
                     ..
                 } => event_loop.exit(),
+
+                // Handle redraw requests
                 WindowEvent::RedrawRequested => {
                     state.window().request_redraw();
                     state.update();
                     match state.render() {
                         Ok(_) => {}
+                        // Handle surface errors
                         Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                             state.resize(state.size)
                         }
@@ -398,6 +417,8 @@ impl ApplicationHandler for App {
                         }
                     }
                 }
+
+                // Handle window resizing
                 WindowEvent::Resized(physical_size) => {
                     state.resize(physical_size);
                 }
@@ -407,8 +428,10 @@ impl ApplicationHandler for App {
     }
 }
 
+// Application entry point
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
+    // Setup logging based on target platform
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -421,6 +444,7 @@ pub async fn run() {
     let event_loop = EventLoop::new().unwrap();
     let mut app = App::new();
 
+    // Run the application - different approaches for native vs web
     #[cfg(not(target_arch="wasm32"))]
     event_loop.run_app(&mut app).unwrap();
 
