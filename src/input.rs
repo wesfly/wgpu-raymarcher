@@ -23,7 +23,7 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                     new_pos.1 - state.mouse_position.1,
                 );
 
-                // Update camera rotation
+                // Update camera rotation based on mouse movement
                 state.camera_rotation.0 += delta.0 * 0.01;
                 state.camera_rotation.1 += delta.1 * -0.01;
 
@@ -52,14 +52,9 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                     state.fps_cap_enabled = !state.fps_cap_enabled;
                     log::info!(
                         "FPS cap {} (target: {} FPS)",
-                        if state.fps_cap_enabled {
-                            "enabled"
-                        } else {
-                            "disabled"
-                        },
+                        if state.fps_cap_enabled { "enabled" } else { "disabled" },
                         state.target_fps
                     );
-
                     state.update_window_title();
                     true
                 }
@@ -71,16 +66,15 @@ pub fn handle_input(state: &mut State, event: &WindowEvent) -> bool {
                     state.y_input_axis = -1;
                     true
                 }
-
+                // W key released - stop moving forward if that was the active direction
                 (KeyCode::KeyW, ElementState::Released) => {
-                    // Only reset if this key was responsible for the current input value
                     if state.y_input_axis == 1 {
                         state.y_input_axis = 0;
                     }
                     true
                 }
+                // S key released - stop moving backward if that was the active direction
                 (KeyCode::KeyS, ElementState::Released) => {
-                    // Only reset if this key was responsible for the current input value
                     if state.y_input_axis == -1 {
                         state.y_input_axis = 0;
                     }
