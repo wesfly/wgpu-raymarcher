@@ -39,8 +39,8 @@ fn vs_main(
 }
 
 struct SdfInfo {
-    dist: f32,          // Distance to surface
-    material_id: i32,   // ID to identify material properties
+    dist: f32,
+    material_id: i32,
 };
 
 // Smooth minimum function for blending SDF shapes
@@ -113,7 +113,7 @@ fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
         }
         case MAT_MIRROR_SPHERE: {
             material.color = vec3<f32>(0.4, 0.4, 0.4);
-            material.reflectivity = 0.9;  // Highly reflective
+            material.reflectivity = 0.9;
         }
         default: { material.color = vec3<f32>(1.0, 1.0, 0.0); }
     }
@@ -155,7 +155,6 @@ fn map_scene(p: vec3<f32>, is_reflection: bool) -> SdfInfo {
     return result;
 }
 
-// Calculate surface normal by sampling the distance field in six directions
 fn get_normal(p: vec3<f32>, is_reflection: bool) -> vec3<f32> {
     let epsilon = select(0.001, 0.005, is_reflection);
     let e = vec2<f32>(epsilon, 0.0);
