@@ -116,7 +116,7 @@ fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
             );
         }
         case MAT_MIRROR_SPHERE: {
-            material.color = vec3<f32>(0.8, 0.8, 0.9);  // Slight blue tint
+            material.color = vec3<f32>(0.4, 0.4, 0.4);
             material.reflectivity = 0.9;  // Highly reflective
         }
         default: {
@@ -131,81 +131,40 @@ fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
 fn map_scene(p: vec3<f32>, is_reflection: bool) -> SdfInfo {
     let time = push_constants.time;
 
-    // For reflections, we can use a simpler scene evaluation to improve performance
-    if (is_reflection) {
-        // Simplified scene for reflections - static objects with no blending
+    let sphere1_pos = vec3<f32>(
+        sin(time) * 1.0,
+        cos(time) * 1.0,
+        2.0
+    );
+    let sphere1 = sphere_sdf(p, sphere1_pos, 0.5, MAT_RED_SPHERE);
 
-        // Simplified spheres (no complex animation)
-        let sphere1 = sphere_sdf(p, vec3<f32>(sin(time), cos(time), 2.0), 0.5, MAT_RED_SPHERE);
-        let sphere2 = sphere_sdf(p, vec3<f32>(cos(time * 0.5) * 1.5, sin(time * 0.7) * 0.8, 2.0), 0.7, MAT_BLUE_SPHERE);
+    let sphere2_pos = vec3<f32>(
+        cos(time * 0.5) * 1.5,
+        sin(time * 0.7) * 0.8,
+        2.0 + sin(time) * 0.5
+    );
+    let sphere2 = sphere_sdf(p, sphere2_pos, 0.7, MAT_BLUE_SPHERE);
 
-        // Box (no interpolation)
-        let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.box_z_position), vec3<f32>(1.0), MAT_GREEN_BOX);
+    let blended_spheres = smin(sphere1, sphere2, 2.8);
 
-        // Ground plane
-        let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
+    let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.box_z_position), vec3<f32>(1.0), MAT_GREEN_BOX);
 
-        // Mirror sphere
-        let mirror_sphere = sphere_sdf(p, vec3<f32>(-2.0, 0.0, 3.0), 1.2, MAT_MIRROR_SPHERE);
+    let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
 
-        // Find nearest object (no blending)
-        var min_dist = sphere1;
+    let mirror_sphere = sphere_sdf(p, vec3<f32>(-2.0, 0.0, 3.0), 1.2, MAT_MIRROR_SPHERE);
 
-        if (sphere2.dist < min_dist.dist) { min_dist = sphere2; }
-        if (box.dist < min_dist.dist) { min_dist = box; }
-        if (ground.dist < min_dist.dist) { min_dist = ground; }
-        if (mirror_sphere.dist < min_dist.dist) { min_dist = mirror_sphere; }
-
-        return min_dist;
+    var result = blended_spheres;
+    if (box.dist < result.dist) {
+        result = box;
     }
-    else {
-        // Full quality scene evaluation for primary rays
-
-        // Animated red sphere
-        let sphere1_pos = vec3<f32>(
-            sin(time) * 1.0,
-            cos(time) * 1.0,
-            2.0
-        );
-        let sphere1 = sphere_sdf(p, sphere1_pos, 0.5, MAT_RED_SPHERE);
-
-        // Animated blue sphere with different movement pattern
-        let sphere2_pos = vec3<f32>(
-            cos(time * 0.5) * 1.5,
-            sin(time * 0.7) * 0.8,
-            2.0 + sin(time) * 0.5
-        );
-        let sphere2 = sphere_sdf(p, sphere2_pos, 0.7, MAT_BLUE_SPHERE);
-
-        // Create smooth blend between the two spheres
-        let blended_spheres = smin(sphere1, sphere2, 0.8);
-
-        // Box that can move along Z axis via user input
-        let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.box_z_position), vec3<f32>(1.0), MAT_GREEN_BOX);
-
-        // Ground plane
-        let ground = plane_sdf(p, vec3<f32>(0.0, 1.0, 0.0), 1.5, MAT_GROUND);
-
-        // Add a reflective mirror sphere
-        let mirror_sphere = sphere_sdf(p, vec3<f32>(-2.0, 0.0, 3.0), 1.2, MAT_MIRROR_SPHERE);
-
-        // Find the closest primitive to the point
-        var result = blended_spheres;
-
-        if (box.dist < result.dist) {
-            result = box;
-        }
-
-        if (ground.dist < result.dist) {
-            result = ground;
-        }
-
-        if (mirror_sphere.dist < result.dist) {
-            result = mirror_sphere;
-        }
-
-        return result;
+    if (ground.dist < result.dist) {
+        result = ground;
     }
+    if (mirror_sphere.dist < result.dist) {
+        result = mirror_sphere;
+    }
+
+    return result;
 }
 
 // Calculate surface normal by sampling the distance field in six directions
@@ -374,7 +333,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let aspect_ratio = push_constants.size.x / push_constants.size.y;
     let uv = in.clip_position.xy / push_constants.size;
 
-    // Shift the UV coordinates to center the view
     let adjusted_uv = vec2<f32>(
         (uv.x - 0.7),
         (uv.y - 0.5) * aspect_ratio
@@ -407,7 +365,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Perform raymarching with reflection
     let colour = march_ray(camera_pos, ray_direction);
 
-    // Reinhard tone mapping to handle high dynamic range
     let tone_mapped = colour / (colour + 1.0);
 
     return vec4<f32>(tone_mapped, 1.0);
