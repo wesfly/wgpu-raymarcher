@@ -157,7 +157,6 @@ fn map_scene(p: vec3<f32>, is_reflection: bool) -> SdfInfo {
 
 // Calculate surface normal by sampling the distance field in six directions
 fn get_normal(p: vec3<f32>, is_reflection: bool) -> vec3<f32> {
-    // Use a larger epsilon for reflections to improve performance
     let epsilon = select(0.001, 0.005, is_reflection);
     let e = vec2<f32>(epsilon, 0.0);
 
@@ -182,16 +181,13 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32, is_re
         if(h < 0.001) {
             return 0.0;  // Fully shadowed
         }
-        // Higher values of h/t create softer shadows
         res = min(res, k * h / t);
-        // Take larger steps for reflections
         t += select(h, h * 2.0, is_reflection);
     }
 
     return res;
 }
 
-// Core raymarching function - returns hit information
 struct RayHit {
     hit: bool,
     position: vec3<f32>,
@@ -253,7 +249,6 @@ fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material
     // Diffuse lighting
     let diff = max(dot(normal, light_dir), 0.0);
 
-    // For reflections, we can use simplified shadows or even skip shadows completely
     let shadow = select(
         soft_shadow(position, light_dir, 0.2, light_dist, 16.0, is_reflection),
         0.6, // Use a constant shadow value for deeper reflections
@@ -265,32 +260,24 @@ fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material
 
 // Main raymarching function with reflection support
 fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
-    // Define variables for reflection iterations
     var final_color = vec3<f32>(0.0);
     var ray_contribution = 1.0;
     var current_origin = ray_origin;
     var current_direction = ray_direction;
 
-    // Maximum number of reflection bounces
     const MAX_BOUNCES = 3;
 
-    // Perform iterative raymarching with reflections
     for (var bounce = 0; bounce < MAX_BOUNCES; bounce++) {
-        // For primary rays use high quality, for reflections use lower quality
         let is_reflection = bounce > 0;
 
         // Raymarch the current ray
         let hit = raymarch_hit(current_origin, current_direction, is_reflection);
 
         if (!hit.hit) {
-            // If we hit nothing, add background color contribution and exit
-            return final_color; // Background is black in this implementation
+            return final_color;
         }
 
-        // Get material properties
         let material = get_material(hit.material_id, hit.position);
-
-        // Calculate lighting at the hit point
         let direct_lighting = calculate_lighting(hit.position, hit.normal, material, is_reflection);
 
         // Add the direct lighting contribution to the final color, accounting for reflectivity
