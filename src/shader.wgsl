@@ -96,12 +96,8 @@ fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
     material.reflectivity = 0.0;  // Default: non-reflective
 
     switch(mat_id) {
-        case MAT_RED_SPHERE: {
-            material.color = vec3<f32>(0.9, 0.1, 0.1);
-        }
-        case MAT_BLUE_SPHERE: {
-            material.color = vec3<f32>(0.1, 0.2, 0.8);
-        }
+        case MAT_RED_SPHERE: { material.color = vec3<f32>(0.9, 0.1, 0.1); }
+        case MAT_BLUE_SPHERE: { material.color = vec3<f32>(0.1, 0.2, 0.8); }
         case MAT_GREEN_BOX: {
             material.color = vec3<f32>(0.2, 0.8, 0.2);
             material.reflectivity = 0.3;  // Slightly reflective
@@ -119,9 +115,7 @@ fn get_material(mat_id: i32, p: vec3<f32>) -> Material {
             material.color = vec3<f32>(0.4, 0.4, 0.4);
             material.reflectivity = 0.9;  // Highly reflective
         }
-        default: {
-            material.color = vec3<f32>(1.0, 1.0, 0.0);
-        }
+        default: { material.color = vec3<f32>(1.0, 1.0, 0.0); }
     }
 
     return material;
@@ -145,7 +139,7 @@ fn map_scene(p: vec3<f32>, is_reflection: bool) -> SdfInfo {
     );
     let sphere2 = sphere_sdf(p, sphere2_pos, 0.7, MAT_BLUE_SPHERE);
 
-    let blended_spheres = smin(sphere1, sphere2, 2.8);
+    let blended_spheres = smin(sphere1, sphere2, 0.8);
 
     let box = box_sdf(p, vec3<f32>(3.2, 0.0, push_constants.box_z_position), vec3<f32>(1.0), MAT_GREEN_BOX);
 
@@ -154,15 +148,9 @@ fn map_scene(p: vec3<f32>, is_reflection: bool) -> SdfInfo {
     let mirror_sphere = sphere_sdf(p, vec3<f32>(-2.0, 0.0, 3.0), 1.2, MAT_MIRROR_SPHERE);
 
     var result = blended_spheres;
-    if (box.dist < result.dist) {
-        result = box;
-    }
-    if (ground.dist < result.dist) {
-        result = ground;
-    }
-    if (mirror_sphere.dist < result.dist) {
-        result = mirror_sphere;
-    }
+    if (box.dist < result.dist) { result = box; }
+    if (ground.dist < result.dist) { result = ground; }
+    if (mirror_sphere.dist < result.dist) { result = mirror_sphere; }
 
     return result;
 }
