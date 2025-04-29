@@ -21,10 +21,10 @@ fn vs_main(
 
     // Define a screen-filling quad (two triangles)
     let positions = array<vec2<f32>, 4>(
-        vec2<f32>(-1.0, 1.0),   // TL vertex 0
-        vec2<f32>(-1.0, -1.0),  // BL vertex 1
-        vec2<f32>(1.0, -1.0),   // BR vertex 2
-        vec2<f32>(1.0, 1.0),    // TR vertex 3
+        vec2<f32>(-1.0, 1.0),
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>(1.0, -1.0),
+        vec2<f32>(1.0, 1.0),
     );
 
     let indices = array<u32, 6>(
@@ -177,9 +177,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, mint: f32, maxt: f32, k: f32, is_re
 
     for(var i: i32 = 0; i < max_steps && t < maxt; i++) {
         let h = map_scene(ro + rd * t, is_reflection).dist;
-        if(h < 0.001) {
-            return 0.0;  // Fully shadowed
-        }
+        if(h < 0.001) { return 0.0; }
         res = min(res, k * h / t);
         t += select(h, h * 2.0, is_reflection);
     }
@@ -198,7 +196,6 @@ struct RayHit {
 fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>, is_reflection: bool) -> RayHit {
     var t: f32 = 0.0;
     let max_steps = select(512, 64, is_reflection);
-    // Use a larger hit distance for reflections (less precision but faster)
     let hit_dist = select(0.01, 0.05, is_reflection);
     const MAX_DIST: f32 = 100.0;
 
@@ -227,7 +224,6 @@ fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>, is_reflection: 
         t += select(d, d * 1.5, is_reflection);
     }
 
-    // No hit found
     return RayHit(
         false,              // hit
         vec3<f32>(0.0),     // position
@@ -248,11 +244,7 @@ fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material
     // Diffuse lighting
     let diff = max(dot(normal, light_dir), 0.0);
 
-    let shadow = select(
-        soft_shadow(position, light_dir, 0.2, light_dist, 16.0, is_reflection),
-        0.6, // Use a constant shadow value for deeper reflections
-        is_reflection && material.reflectivity > 0.5
-    );
+    let shadow = soft_shadow(position, light_dir, 0.2, light_dist, 16.0, is_reflection);
 
     return material.color * (AMBIENT + diff * shadow);
 }
@@ -272,9 +264,7 @@ fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
         // Raymarch the current ray
         let hit = raymarch_hit(current_origin, current_direction, is_reflection);
 
-        if (!hit.hit) {
-            return final_color;
-        }
+        if (!hit.hit) { return final_color; }
 
         let material = get_material(hit.material_id, hit.position);
         let direct_lighting = calculate_lighting(hit.position, hit.normal, material, is_reflection);
@@ -283,9 +273,7 @@ fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
         final_color += ray_contribution * (1.0 - material.reflectivity) * direct_lighting;
 
         // If material is not reflective or we reached max bounces, exit
-        if (material.reflectivity < 0.01 || bounce == MAX_BOUNCES - 1) {
-            break;
-        }
+        if (material.reflectivity < 0.01 || bounce == MAX_BOUNCES - 1) { break; }
 
         // Set up next reflection ray
         current_direction = reflect(current_direction, hit.normal);
