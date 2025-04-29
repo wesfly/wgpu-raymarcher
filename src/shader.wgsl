@@ -195,7 +195,7 @@ struct RayHit {
 
 fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>, is_reflection: bool) -> RayHit {
     var t: f32 = 0.0;
-    let max_steps = select(512, 64, is_reflection);
+    let max_steps = select(512, 38, is_reflection);
     let hit_dist = select(0.01, 0.05, is_reflection);
     const MAX_DIST: f32 = 100.0;
 
@@ -207,11 +207,11 @@ fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>, is_reflection: 
         if(d < hit_dist) {
             let normal = get_normal(p, is_reflection);
             return RayHit(
-                true,                 // hit
-                p,                    // position
-                normal,               // normal
+                true,                   // hit
+                p,                      // position
+                normal,                 // normal
                 scene_info.material_id, // material_id
-                t                     // distance
+                t                       // distance
             );
         }
 
@@ -219,7 +219,6 @@ fn raymarch_hit(ray_origin: vec3<f32>, ray_direction: vec3<f32>, is_reflection: 
             break;
         }
 
-        // Ray marching step - advance by distance to nearest surface
         // Take larger steps for reflections
         t += select(d, d * 1.5, is_reflection);
     }
@@ -249,7 +248,7 @@ fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material
     return material.color * (AMBIENT + diff * shadow);
 }
 
-// Main raymarching function with reflection support
+
 fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var final_color = vec3<f32>(0.0);
     var ray_contribution = 1.0;
