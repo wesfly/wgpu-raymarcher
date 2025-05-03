@@ -1,5 +1,6 @@
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
 };
 
 struct Properties {
@@ -12,6 +13,7 @@ struct Properties {
 }
 
 var<push_constant> push_constants: Properties;
+var<private> box_position: vec3<f32>;
 
 @vertex
 fn vs_main(
@@ -27,6 +29,13 @@ fn vs_main(
         vec2<f32>(1.0, 1.0),
     );
 
+    let uvs = array<vec2<f32>, 4>(
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>(-1.0, 1.0),
+        vec2<f32>(1.0, 1.0),
+        vec2<f32>(1.0, -1.0),
+    );
+
     let indices = array<u32, 6>(
         0, 1, 2,
         0, 2, 3
@@ -34,6 +43,9 @@ fn vs_main(
 
     let pos = positions[indices[in_vertex_index]];
     out.clip_position = vec4<f32>(pos.x, pos.y, 0.0, 1.0);
+
+    // Initialize the UV coordinates properly
+    out.uv = uvs[indices[in_vertex_index]];
 
     return out;
 }
@@ -248,7 +260,6 @@ fn calculate_lighting(position: vec3<f32>, normal: vec3<f32>, material: Material
     return material.color * (AMBIENT + diff * shadow);
 }
 
-
 fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
     var final_color = vec3<f32>(0.0);
     var ray_contribution = 1.0;
@@ -291,13 +302,9 @@ fn march_ray(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let aspect_ratio = push_constants.size.x / push_constants.size.y;
-    let uv = in.clip_position.xy / push_constants.size;
+    let aspect_ratio = push_constants.size.y / push_constants.size.x;
 
-    let adjusted_uv = vec2<f32>(
-        (uv.x - 0.7),
-        (uv.y - 0.5) * aspect_ratio
-    );
+    let uv = vec2<f32>(in.uv.x, in.uv.y * aspect_ratio);
 
     // Create camera rotation matrices based on yaw and pitch inputs
     let cos_yaw = cos(push_constants.camera_yaw);
@@ -321,9 +328,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let camera_pos = vec3<f32>(0.0, 0.0, -3.0);
     // Apply camera rotations to the ray direction
-    let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(adjusted_uv.x, adjusted_uv.y, 1.0));
+    let ray_direction = normalize(rotation_y * rotation_x * vec3<f32>(uv.x, uv.y, 1.0));
 
-    // Perform raymarching with reflection
     let colour = march_ray(camera_pos, ray_direction);
 
     let tone_mapped = colour / (colour + 1.0);

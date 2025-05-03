@@ -294,7 +294,7 @@ impl State {
                 wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 0,
                 bytemuck::cast_slice(&[
-                    self.config.height as f32,
+                    self.config.width as f32,
                     self.config.height as f32,
                     elapsed,
                     self.camera_rotation.0,
