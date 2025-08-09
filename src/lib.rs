@@ -17,9 +17,6 @@ use winit::{
 mod input;
 use input::handle_input;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
 pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -50,10 +47,7 @@ impl State {
 
         // Create the WGPU instance with appropriate backend settings
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
-            #[cfg(target_arch = "wasm32")]
-            backends: wgpu::Backends::GL,
             ..Default::default()
         });
 
@@ -345,23 +339,6 @@ impl ApplicationHandler for App {
 
         let window = event_loop.create_window(window_attributes).unwrap();
 
-        // Special setup for WebAssembly target
-        #[cfg(target_arch = "wasm32")]
-        {
-            use winit::platform::web::WindowExtWebSys;
-            let _ = window.request_inner_size(PhysicalSize::new(650, 400));
-
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
-                    let canvas = web_sys::Element::from(window.canvas()?);
-                    dst.append_child(&canvas).ok()?;
-                    Some(())
-                })
-                .expect("Couldn't append canvas to document body.");
-        }
-
         // Initialize application state
         self.state = Some(pollster::block_on(State::new(window)));
     }
@@ -424,26 +401,10 @@ impl ApplicationHandler for App {
 // Application entry point
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
-    // Setup logging
-    cfg_if::cfg_if! {
-        if #[cfg(target_arch = "wasm32")] {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::Warn).expect("Could't initialize logger");
-        } else {
-            env_logger::init();
-        }
-    }
+    env_logger::init();
 
     let event_loop = EventLoop::new().unwrap();
     let mut app = App::new();
 
-    // Run the application - different approaches for native vs web
-    #[cfg(not(target_arch = "wasm32"))]
     event_loop.run_app(&mut app).unwrap();
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::platform::web::EventLoopExtWebSys;
-        event_loop.spawn_app(app);
-    }
 }
