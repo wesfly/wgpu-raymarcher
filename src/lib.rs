@@ -38,7 +38,7 @@ pub struct State {
     pub fps_cap_enabled: bool,
     pub target_fps: u32,
     last_frame_time: Instant,
-    pub y_input_axis: i8,      // (-1, 0, 1)
+    pub y_input_axis: i8, // (-1, 0, 1)
     pub box_z_position: f32,
     last_update_time: Instant, // For calculating delta time in physics updates
 }
@@ -71,22 +71,20 @@ impl State {
 
         // Create device and queue with push constant support
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("GPU Device"),
-                    required_features: wgpu::Features::PUSH_CONSTANTS,
-                    required_limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits {
-                            max_push_constant_size: 256,
-                            ..Default::default()
-                        }
-                    },
-                    memory_hints: Default::default(),
-                    trace: wgpu::Trace::Off,
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("GPU Device"),
+                required_features: wgpu::Features::PUSH_CONSTANTS,
+                required_limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits {
+                        max_push_constant_size: 256,
+                        ..Default::default()
+                    }
                 },
-            )
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .unwrap();
 
@@ -268,6 +266,7 @@ impl State {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    depth_slice: None,
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -317,7 +316,8 @@ impl State {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_fps_update);
 
-        if elapsed.as_secs_f64() > 0.1 {    // Update every 10th of a second
+        if elapsed.as_secs_f64() > 0.1 {
+            // Update every 10th of a second
             self.fps = self.frame_count as f64 / elapsed.as_secs_f64();
             self.frame_count = 0;
             self.last_fps_update = now;
@@ -341,12 +341,9 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attributes = WindowAttributes::default()
-            .with_title(env!("CARGO_PKG_NAME"));
+        let window_attributes = WindowAttributes::default().with_title(env!("CARGO_PKG_NAME"));
 
-        let window = event_loop
-            .create_window(window_attributes)
-            .unwrap();
+        let window = event_loop.create_window(window_attributes).unwrap();
 
         // Special setup for WebAssembly target
         #[cfg(target_arch = "wasm32")]
@@ -441,10 +438,10 @@ pub async fn run() {
     let mut app = App::new();
 
     // Run the application - different approaches for native vs web
-    #[cfg(not(target_arch="wasm32"))]
+    #[cfg(not(target_arch = "wasm32"))]
     event_loop.run_app(&mut app).unwrap();
 
-    #[cfg(target_arch="wasm32")]
+    #[cfg(target_arch = "wasm32")]
     {
         use winit::platform::web::EventLoopExtWebSys;
         event_loop.spawn_app(app);
