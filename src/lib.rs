@@ -76,6 +76,7 @@ impl State {
                         ..Default::default()
                     }
                 },
+                experimental_features: Default::default(),
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
             })
